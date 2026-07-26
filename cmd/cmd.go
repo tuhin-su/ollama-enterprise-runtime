@@ -288,24 +288,39 @@ func CreateHandler(cmd *cobra.Command, args []string) error {
 
 	// Standard Modelfile + API path
 	var reader io.Reader
+	var filename string
 
-	filename, err := getModelfileName(cmd)
-	if os.IsNotExist(err) {
-		if filename == "" {
-			reader = strings.NewReader("FROM .\n")
-		} else {
-			return errModelfileNotFound
-		}
-	} else if err != nil {
-		return err
-	} else {
-		f, err := os.Open(filename)
+	ggufPath, _ := cmd.Flags().GetString("gguf")
+	if ggufPath != "" {
+		absPath, err := filepath.Abs(ggufPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("invalid gguf path: %w", err)
 		}
+		if _, err := os.Stat(absPath); err != nil {
+			return fmt.Errorf("gguf file not found: %w", err)
+		}
+		reader = strings.NewReader(fmt.Sprintf("FROM %s\n", absPath))
+		filename = absPath
+	} else {
+		var err error
+		filename, err = getModelfileName(cmd)
+		if os.IsNotExist(err) {
+			if filename == "" {
+				reader = strings.NewReader("FROM .\n")
+			} else {
+				return errModelfileNotFound
+			}
+		} else if err != nil {
+			return err
+		} else {
+			f, err := os.Open(filename)
+			if err != nil {
+				return err
+			}
 
-		reader = f
-		defer f.Close()
+			reader = f
+			defer f.Close()
+		}
 	}
 
 	modelfile, err := parser.ParseFile(reader)
@@ -2292,6 +2307,7 @@ func NewCLI() *cobra.Command {
 	}
 
 	createCmd.Flags().StringP("file", "f", "", "Name of the Modelfile (default \"Modelfile\")")
+	createCmd.Flags().String("gguf", "", "Path to GGUF file to import directly")
 	createCmd.Flags().StringP("quantize", "q", "", "Quantize model to this level (e.g. q4_K_M)")
 	createCmd.Flags().String("draft-quantize", "", "Quantize draft model to this level")
 	createCmd.Flags().Bool("experimental", false, "Enable experimental safetensors model creation")
