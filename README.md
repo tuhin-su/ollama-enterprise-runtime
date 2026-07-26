@@ -8,31 +8,30 @@
 
 Start building with open models.
 
-## Download
+## Install
 
-### macOS
+### Linux & macOS
 
-```shell
-curl -fsSL https://ollama.com/install.sh | sh
+```bash
+curl -fsSL https://raw.githubusercontent.com/tuhin-su/ollama-master/main/install.sh | sh
 ```
 
-or [download manually](https://ollama.com/download/Ollama.dmg)
+Auto-detects: `linux` / `darwin` × `amd64` / `arm64` / `arm`
 
 ### Windows
 
-```shell
-irm https://ollama.com/install.ps1 | iex
+```powershell
+irm https://raw.githubusercontent.com/tuhin-su/ollama-master/main/install.ps1 | iex
 ```
 
-or [download manually](https://ollama.com/download/OllamaSetup.exe)
+Auto-detects: `amd64` / `arm64`. Optionally registers a Windows service.
 
-### Linux
+### Manual Download
 
-```shell
-curl -fsSL https://ollama.com/install.sh | sh
-```
+Download any binary from the [Releases page](https://github.com/tuhin-su/ollama-master/releases).
+Each asset includes a `.sha256` checksum file.
 
-[Manual install instructions](https://docs.ollama.com/linux#manual-install)
+See [docs/installation.md](docs/installation.md) for full instructions, pinning a version, updating, and uninstalling.
 
 ### Docker
 
@@ -173,6 +172,9 @@ console.log(response.message.content);
 
 - [CLI reference](https://docs.ollama.com/cli)
 - [REST API reference](https://docs.ollama.com/api)
+- [Installation guide](docs/installation.md) — all platforms, update, uninstall
+- [Server configuration](docs/server-config.md) — token auth, memory system
+- [Long-term memory](docs/memory.md) — native persistent memory across sessions
 - [Importing models](https://docs.ollama.com/import)
 - [Modelfile reference](https://docs.ollama.com/modelfile)
 - [Building from source](https://github.com/ollama/ollama/blob/main/docs/development.md)

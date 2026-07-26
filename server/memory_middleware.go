@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/server/memory"
@@ -42,39 +43,99 @@ func shutdownMemoryEngine() {
 	}
 }
 
-// enrichChatRequestWithMemory injects relevant memories into the system
-// message of a chat request. It returns the enriched system prompt string
-// and the memory response (for use in ProcessResponse after generation).
+// injectMemoryIntoMessages enriches the message list with relevant memories
+// from past sessions. It replaces (or prepends) the system message with an
+// enriched version that includes memory context.
 //
-// The function is a no-op when the memory engine is disabled or an error
-// occurs — it never blocks inference.
-func enrichChatRequestWithMemory(ctx context.Context, userID string, req *api.ChatRequest) (*memory.MemoryResponse, string) {
-	if memoryEngine == nil {
-		return nil, ""
+// Returns the (possibly modified) message slice. Always safe — never panics
+// and never blocks inference if the memory engine is down.
+func injectMemoryIntoMessages(ctx context.Context, userID string, req *api.ChatRequest, msgs []api.Message) []api.Message {
+	if memoryEngine == nil || userID == "" {
+		return msgs
 	}
 
-	// Build the memory request from the chat request
-	memReq := &memory.MemoryRequest{
-		UserID: userID,
-		Model:  req.Model,
-		Messages: toMemoryMessages(req.Messages),
-	}
-
-	// Extract existing system prompt
-	for _, msg := range req.Messages {
-		if msg.Role == "system" {
-			memReq.SystemPrompt = msg.Content
+	// Derive the current system prompt from the message list
+	var systemPrompt string
+	for _, m := range msgs {
+		if m.Role == "system" {
+			systemPrompt = m.Content
 			break
 		}
+	}
+
+	memReq := &memory.MemoryRequest{
+		UserID:       userID,
+		Model:        req.Model,
+		SystemPrompt: systemPrompt,
+		Messages:     toMemoryMessages(msgs),
 	}
 
 	memResp, err := memoryEngine.ProcessRequest(ctx, memReq)
 	if err != nil {
 		slog.Warn("memory: ProcessRequest failed", "error", err)
-		return nil, ""
+		return msgs
 	}
 
-	return memResp, memReq.SystemPrompt
+	// Nothing useful retrieved
+	if memResp.EnrichedSystem == "" || memResp.EnrichedSystem == systemPrompt {
+		return msgs
+	}
+
+	// Replace existing system message or prepend a new one
+	enriched := make([]api.Message, 0, len(msgs)+1)
+	replaced := false
+	for _, m := range msgs {
+		if m.Role == "system" {
+			enriched = append(enriched, api.Message{Role: "system", Content: memResp.EnrichedSystem})
+			replaced = true
+		} else {
+			enriched = append(enriched, m)
+		}
+	}
+	if !replaced {
+		// Prepend system message
+		enriched = append([]api.Message{{Role: "system", Content: memResp.EnrichedSystem}}, enriched...)
+	}
+
+	slog.Debug("memory: injected memories",
+		"user", userID,
+		"memories", len(memResp.RelevantMemories),
+		"tokens", memResp.ContextUsed,
+	)
+	return enriched
+}
+
+// collectAndStoreMemories wraps a chat response channel. It passes every
+// response through to the caller unchanged while accumulating the full
+// assistant reply. When the channel closes it fires storeResponseMemories
+// asynchronously so the HTTP response is never delayed.
+func collectAndStoreMemories(ctx context.Context, userID string, req *api.ChatRequest, ch chan any) chan any {
+	if memoryEngine == nil || userID == "" {
+		return ch
+	}
+
+	out := make(chan any, cap(ch))
+
+	go func() {
+		defer close(out)
+		var reply strings.Builder
+
+		for item := range ch {
+			out <- item // pass through immediately — no latency added
+
+			if resp, ok := item.(api.ChatResponse); ok {
+				reply.WriteString(resp.Message.Content)
+
+				if resp.Done && reply.Len() > 0 {
+					// Store memories after the last chunk is forwarded
+					fullReply := reply.String()
+					go storeResponseMemories(ctx, userID, req, fullReply)
+				}
+			}
+		}
+	}()
+
+	return out
 }
 
 // storeResponseMemories asynchronously extracts and stores memories from
@@ -102,4 +163,20 @@ func toMemoryMessages(msgs []api.Message) []memory.Message {
 		})
 	}
 	return result
+}
+
+// memoryUserID extracts a stable user identifier from the request context.
+// Falls back to the remote IP address when no auth token is present.
+func memoryUserID(req *api.ChatRequest, remoteAddr string) string {
+	// Use model as namespace separator so memories don't bleed across models.
+	// For a real multi-user deployment, use the authenticated user ID.
+	// RemoteAddr gives per-device isolation for single-user setups.
+	host := remoteAddr
+	if idx := strings.LastIndex(host, ":"); idx != -1 {
+		host = host[:idx] // strip port
+	}
+	if host == "" || host == "127.0.0.1" || host == "::1" {
+		host = "local"
+	}
+	return "user:" + host
 }

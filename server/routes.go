@@ -2690,6 +2690,11 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	}
 	msgs = filterThinkTags(msgs, m)
 
+	// --- Memory subsystem: enrich messages with long-term memory context ---
+	memUID := memoryUserID(&req, c.Request.RemoteAddr)
+	msgs = injectMemoryIntoMessages(c.Request.Context(), memUID, &req, msgs)
+	// -----------------------------------------------------------------------
+
 	if shouldUseHarmony(m) {
 		// harmony's Reasoning field only understands low/medium/high; map "max" to "high"
 		if req.Think != nil {
@@ -2961,6 +2966,9 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		}
 	}()
 
+	// --- Memory subsystem: capture reply and store new memories async ---
+	ch = collectAndStoreMemories(c.Request.Context(), memUID, &req, ch)
+	// --------------------------------------------------------------------
 	writeChatResponse(c, req, ch)
 }
 
