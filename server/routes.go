@@ -2036,6 +2036,10 @@ func Serve(ln net.Listener) error {
 	s.sched = sched
 	s.modelCaches.Start(ctx)
 
+	// Memory subsystem — reads ~/.ollama/server.json for config.
+	// No-op when memory.enabled is false (the default).
+	initMemoryEngine(ctx)
+
 	slog.Info(fmt.Sprintf("Listening on %s (version %s)", ln.Addr(), version.Version))
 	srvr := &http.Server{
 		// Use http.DefaultServeMux so we get net/http/pprof for
@@ -2057,6 +2061,7 @@ func Serve(ln net.Listener) error {
 		srvr.Close()
 		schedDone()
 		sched.unloadAllRunners()
+		shutdownMemoryEngine()
 		done()
 	}()
 
