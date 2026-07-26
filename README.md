@@ -89,13 +89,30 @@ See the [quickstart guide](https://docs.ollama.com/quickstart) for more details.
 
 ### Importing GGUF Models
 
-You can directly create an Ollama model from any local GGUF file using the `--gguf` flag with `ollama create`:
+You can import any local GGUF file directly into Ollama using the `ollama import` command:
 
 ```shell
-ollama create my-model --gguf /path/to/model.gguf
+# Import a model (name is auto-derived)
+ollama import /path/to/model.gguf
+
+# Specify a custom name
+ollama import /path/to/model.gguf --name my-model
+
+# Import a Vision-Language (VL) model with its multimodal projector
+ollama import /path/to/model.gguf --mmproj /path/to/mmproj.gguf --name my-vl-model
 ```
 
-You can also specify a custom Modelfile or additional options if needed, but `--gguf` automatically handles importing the model file directly without requiring manual Modelfile creation.
+### Exporting GGUF Models
+
+You can export GGUF files back out of Ollama's local storage:
+
+```shell
+# Export a model
+ollama export my-model model.gguf
+
+# Export a VL model (projector is auto-exported as well)
+ollama export my-vl-model model.gguf
+```
 
 ## REST API
 
