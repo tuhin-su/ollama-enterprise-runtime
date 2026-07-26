@@ -1831,6 +1831,40 @@ func allowedHostsMiddleware(addr net.Addr) gin.HandlerFunc {
 	}
 }
 
+// tokenAuthMiddleware returns a Gin middleware that enforces Bearer-token
+// authentication when an api_token is configured in ~/.ollama/server.json.
+// If no token is configured the middleware is a no-op.
+// Health-check endpoints (HEAD / and GET /) are always exempt.
+func tokenAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := envconfig.APIToken()
+		if token == "" {
+			c.Next()
+			return
+		}
+
+		// Allow unauthenticated health checks so load-balancers work.
+		if c.Request.URL.Path == "/" {
+			c.Next()
+			return
+		}
+
+		auth := c.GetHeader("Authorization")
+		const prefix = "Bearer "
+		if !strings.HasPrefix(auth, prefix) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid Authorization header, expected 'Bearer <token>'"})
+			return
+		}
+
+		if strings.TrimPrefix(auth, prefix) != token {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid API token"})
+			return
+		}
+
+		c.Next()
+	}
+}
+
 func (s *Server) GenerateRoutes() (http.Handler, error) {
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowWildcard = true
@@ -1864,6 +1898,7 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 	r.Use(
 		cors.New(corsConfig),
 		allowedHostsMiddleware(s.addr),
+		tokenAuthMiddleware(),
 	)
 
 	// General

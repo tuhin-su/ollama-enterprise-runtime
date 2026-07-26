@@ -378,7 +378,8 @@ func Var(key string) string {
 
 // serverConfigData holds the parsed fields from ~/.ollama/server.json.
 type serverConfigData struct {
-	DisableOllamaCloud bool `json:"disable_ollama_cloud,omitempty"`
+	DisableOllamaCloud bool   `json:"disable_ollama_cloud,omitempty"`
+	APIToken           string `json:"api_token,omitempty"`
 }
 
 var (
@@ -443,6 +444,14 @@ func NoCloud() bool {
 	}
 	loadServerConfig()
 	return cachedServerConfig().DisableOllamaCloud
+}
+
+// APIToken returns the configured API token from ~/.ollama/server.json.
+// When non-empty the server enforces Bearer-token authentication on all
+// API requests.
+func APIToken() string {
+	loadServerConfig()
+	return cachedServerConfig().APIToken
 }
 
 // NoCloudSource returns the source of the cloud-disabled decision.

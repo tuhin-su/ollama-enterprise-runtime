@@ -557,7 +557,6 @@ func ImportHandler(cmd *cobra.Command, args []string) error {
 }
 
 // deriveModelName extracts a model name from a GGUF filename.
-// deriveModelName extracts a model name from a GGUF filename.
 // e.g. "qwen2.5-vl-7b-instruct-f16.gguf" -> "qwen2.5-vl-7b-instruct-f16"
 //
 // It strips known suffixes like file extensions and common GGUF naming
