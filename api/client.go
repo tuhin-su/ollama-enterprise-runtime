@@ -138,8 +138,13 @@ func (c *Client) do(ctx context.Context, method, path string, reqData, respData 
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("User-Agent", fmt.Sprintf("ollama/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version()))
 
+
 	if token != "" {
 		request.Header.Set("Authorization", token)
+	} else if localToken := envconfig.APIToken(); localToken != "" && c.base.Hostname() != "ollama.com" {
+		// Local server has token auth enabled — inject it automatically so the
+		// CLI does not need the user to pass it manually.
+		request.Header.Set("Authorization", "Bearer "+localToken)
 	}
 
 	respObj, err := c.http.Do(request)
@@ -206,6 +211,10 @@ func (c *Client) stream(ctx context.Context, method, path string, data any, fn f
 
 	if token != "" {
 		request.Header.Set("Authorization", token)
+	} else if localToken := envconfig.APIToken(); localToken != "" && c.base.Hostname() != "ollama.com" {
+		// Local server has token auth enabled — inject it automatically so the
+		// CLI does not need the user to pass it manually.
+		request.Header.Set("Authorization", "Bearer "+localToken)
 	}
 
 	response, err := c.http.Do(request)
