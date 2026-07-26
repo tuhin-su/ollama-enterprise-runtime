@@ -87,6 +87,16 @@ See [ollama.com/library](https://ollama.com/library) for the full list.
 
 See the [quickstart guide](https://docs.ollama.com/quickstart) for more details.
 
+### Importing GGUF Models
+
+You can directly create an Ollama model from any local GGUF file using the `--gguf` flag with `ollama create`:
+
+```shell
+ollama create my-model --gguf /path/to/model.gguf
+```
+
+You can also specify a custom Modelfile or additional options if needed, but `--gguf` automatically handles importing the model file directly without requiring manual Modelfile creation.
+
 ## REST API
 
 Ollama has a REST API for running and managing models.
