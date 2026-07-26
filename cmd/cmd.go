@@ -557,6 +557,7 @@ func ImportHandler(cmd *cobra.Command, args []string) error {
 }
 
 // deriveModelName extracts a model name from a GGUF filename.
+// deriveModelName extracts a model name from a GGUF filename.
 // e.g. "qwen2.5-vl-7b-instruct-f16.gguf" -> "qwen2.5-vl-7b-instruct-f16"
 //
 // It strips known suffixes like file extensions and common GGUF naming
@@ -587,6 +588,88 @@ func deriveModelName(ggufPath string) string {
 
 	return name
 }
+
+// ExportHandler handles exporting a model's GGUF file(s) back out of Ollama.
+func ExportHandler(cmd *cobra.Command, args []string) error {
+	modelName := args[0]
+	destPath := args[1]
+
+	// Resolve absolute path for destination
+	absDestPath, err := filepath.Abs(destPath)
+	if err != nil {
+		return fmt.Errorf("invalid destination path: %w", err)
+	}
+
+	// We'll run server-side checks locally by calling GetModel from the server package
+	m, err := server.GetModel(modelName)
+	if err != nil {
+		return fmt.Errorf("failed to get model %q: %w", modelName, err)
+	}
+
+	if m.ModelPath == "" {
+		return fmt.Errorf("model %q has no GGUF file path associated with it", modelName)
+	}
+
+	srcFile, err := os.Open(m.ModelPath)
+	if err != nil {
+		return fmt.Errorf("failed to open source GGUF: %w", err)
+	}
+	defer srcFile.Close()
+
+	// If destination is a directory, use the model name as the filename
+	fi, err := os.Stat(absDestPath)
+	if err == nil && fi.IsDir() {
+		absDestPath = filepath.Join(absDestPath, fmt.Sprintf("%s.gguf", deriveModelName(modelName)))
+	}
+
+	destFile, err := os.Create(absDestPath)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer destFile.Close()
+
+	fmt.Printf("Exporting model to %s...\n", absDestPath)
+	if _, err := io.Copy(destFile, srcFile); err != nil {
+		return fmt.Errorf("failed to copy model data: %w", err)
+	}
+
+	// If there's an associated multimodal projector (VL model), export it too!
+	if len(m.ProjectorPaths) > 0 {
+		projSrcPath := m.ProjectorPaths[0]
+		projDestPath := cmd.Flag("mmproj").Value.String()
+		if projDestPath == "" {
+			// Auto-derive projector filename in the same directory as the model
+			destDir := filepath.Dir(absDestPath)
+			projDestPath = filepath.Join(destDir, fmt.Sprintf("%s-mmproj.gguf", deriveModelName(modelName)))
+		} else {
+			projDestPath, err = filepath.Abs(projDestPath)
+			if err != nil {
+				return fmt.Errorf("invalid mmproj destination path: %w", err)
+			}
+		}
+
+		projSrcFile, err := os.Open(projSrcPath)
+		if err != nil {
+			return fmt.Errorf("failed to open source projector: %w", err)
+		}
+		defer projSrcFile.Close()
+
+		projDestFile, err := os.Create(projDestPath)
+		if err != nil {
+			return fmt.Errorf("failed to create projector destination file: %w", err)
+		}
+		defer projDestFile.Close()
+
+		fmt.Printf("Exporting projector to %s...\n", projDestPath)
+		if _, err := io.Copy(projDestFile, projSrcFile); err != nil {
+			return fmt.Errorf("failed to copy projector data: %w", err)
+		}
+	}
+
+	fmt.Println("Export completed successfully.")
+	return nil
+}
+
 
 func createRequestFileNames(files map[string]string) map[string]string {
 	names := make(map[string]string, len(files))
@@ -2481,6 +2564,26 @@ Examples:
 	importCmd.Flags().String("mmproj", "", "Path to multimodal projector GGUF file for vision models")
 	importCmd.Flags().StringP("quantize", "q", "", "Quantize model to this level (e.g. q4_K_M)")
 
+	exportCmd := &cobra.Command{
+		Use:   "export MODEL DESTINATION",
+		Short: "Export a model back to a GGUF file",
+		Long: `Export a model's GGUF file(s) from Ollama's local storage to a specified destination.
+
+If the model is a Vision-Language (VL) model, the multimodal projector (mmproj) file
+will also be exported.
+
+Examples:
+  ollama export mymodel model.gguf
+  ollama export mymodel /path/to/directory/
+  ollama export mymodel model.gguf --mmproj vision-projector.gguf`,
+		Args:    cobra.ExactArgs(2),
+		PreRunE: checkServerHeartbeat,
+		RunE:    ExportHandler,
+	}
+
+	exportCmd.Flags().String("mmproj", "", "Custom destination path for the multimodal projector file (optional)")
+
+
 	showCmd := &cobra.Command{
 		Use:     "show MODEL",
 		Short:   "Show information for a model",
@@ -2650,6 +2753,7 @@ Examples:
 	for _, cmd := range []*cobra.Command{
 		createCmd,
 		importCmd,
+		exportCmd,
 		showCmd,
 		runCmd,
 		stopCmd,
@@ -2698,6 +2802,7 @@ Examples:
 		serveCmd,
 		createCmd,
 		importCmd,
+		exportCmd,
 		showCmd,
 		runCmd,
 		stopCmd,
