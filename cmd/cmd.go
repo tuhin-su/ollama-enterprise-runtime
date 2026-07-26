@@ -290,37 +290,23 @@ func CreateHandler(cmd *cobra.Command, args []string) error {
 	var reader io.Reader
 	var filename string
 
-	ggufPath, _ := cmd.Flags().GetString("gguf")
-	if ggufPath != "" {
-		absPath, err := filepath.Abs(ggufPath)
-		if err != nil {
-			return fmt.Errorf("invalid gguf path: %w", err)
-		}
-		if _, err := os.Stat(absPath); err != nil {
-			return fmt.Errorf("gguf file not found: %w", err)
-		}
-		reader = strings.NewReader(fmt.Sprintf("FROM %s\n", absPath))
-		filename = absPath
-	} else {
-		var err error
-		filename, err = getModelfileName(cmd)
-		if os.IsNotExist(err) {
-			if filename == "" {
-				reader = strings.NewReader("FROM .\n")
-			} else {
-				return errModelfileNotFound
-			}
-		} else if err != nil {
-			return err
+	filename, err := getModelfileName(cmd)
+	if os.IsNotExist(err) {
+		if filename == "" {
+			reader = strings.NewReader("FROM .\n")
 		} else {
-			f, err := os.Open(filename)
-			if err != nil {
-				return err
-			}
-
-			reader = f
-			defer f.Close()
+			return errModelfileNotFound
 		}
+	} else if err != nil {
+		return err
+	} else {
+		f, err := os.Open(filename)
+		if err != nil {
+			return err
+		}
+
+		reader = f
+		defer f.Close()
 	}
 
 	modelfile, err := parser.ParseFile(reader)
@@ -438,7 +424,168 @@ func CreateHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+
+
 	return nil
+}
+
+// ImportHandler handles the `ollama import` command for importing GGUF files directly.
+func ImportHandler(cmd *cobra.Command, args []string) error {
+	p := progress.NewProgress(os.Stderr)
+	defer p.Stop()
+
+	ggufPath := args[0]
+
+	absPath, err := filepath.Abs(ggufPath)
+	if err != nil {
+		return fmt.Errorf("invalid gguf path: %w", err)
+	}
+	if _, err := os.Stat(absPath); err != nil {
+		return fmt.Errorf("gguf file not found: %w", err)
+	}
+
+	// Determine model name: use --name flag, or derive from filename
+	modelName, _ := cmd.Flags().GetString("name")
+	if modelName == "" {
+		modelName = deriveModelName(ggufPath)
+	}
+
+	name := model.ParseName(modelName)
+	if !name.IsValid() {
+		return fmt.Errorf("invalid model name %q (use --name to specify a valid name)", modelName)
+	}
+
+	// Build synthetic Modelfile content
+	modelfileContent := fmt.Sprintf("FROM %s\n", absPath)
+
+	mmprojPath, _ := cmd.Flags().GetString("mmproj")
+	if mmprojPath != "" {
+		absMMPath, err := filepath.Abs(mmprojPath)
+		if err != nil {
+			return fmt.Errorf("invalid mmproj path: %w", err)
+		}
+		if _, err := os.Stat(absMMPath); err != nil {
+			return fmt.Errorf("mmproj file not found: %w", err)
+		}
+		modelfileContent += fmt.Sprintf("FROM %s\n", absMMPath)
+	}
+
+	reader := strings.NewReader(modelfileContent)
+
+	modelfile, err := parser.ParseFile(reader)
+	if err != nil {
+		return err
+	}
+
+	status := "gathering model components"
+	spinner := progress.NewSpinner(status)
+	p.Add(status, spinner)
+
+	req, err := modelfile.CreateRequest(filepath.Dir(absPath))
+	if err != nil {
+		return err
+	}
+	spinner.Stop()
+
+	req.Model = modelName
+	quantize, _ := cmd.Flags().GetString("quantize")
+	if quantize != "" {
+		req.Quantize = quantize
+	}
+
+	client, err := api.ClientFromEnvironment()
+	if err != nil {
+		return err
+	}
+
+	var g errgroup.Group
+	g.SetLimit(max(runtime.GOMAXPROCS(0)-1, 1))
+
+	files := syncmap.NewSyncMap[string, string]()
+	fileNames := createRequestFileNames(req.Files)
+	for f, digest := range req.Files {
+		g.Go(func() error {
+			if _, err := createBlob(cmd, client, f, digest, p); err != nil {
+				return err
+			}
+
+			files.Store(fileNames[f], digest)
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	req.Files = files.Items()
+
+	bars := make(map[string]*progress.Bar)
+	fn := func(resp api.ProgressResponse) error {
+		if resp.Digest != "" {
+			bar, ok := bars[resp.Digest]
+			if !ok {
+				msg := resp.Status
+				if msg == "" {
+					msg = fmt.Sprintf("pulling %s...", resp.Digest[7:19])
+				}
+				bar = progress.NewBar(msg, resp.Total, resp.Completed)
+				bars[resp.Digest] = bar
+				p.Add(resp.Digest, bar)
+			}
+
+			bar.Set(resp.Completed)
+		} else if status != resp.Status {
+			spinner.Stop()
+
+			status = resp.Status
+			spinner = progress.NewSpinner(status)
+			p.Add(status, spinner)
+		}
+
+		return nil
+	}
+
+	if err := client.Create(cmd.Context(), req, fn); err != nil {
+		return err
+	}
+
+	p.Stop()
+	fmt.Printf("Successfully imported %q as %s\n", filepath.Base(ggufPath), modelName)
+
+	return nil
+}
+
+// deriveModelName extracts a model name from a GGUF filename.
+// e.g. "qwen2.5-vl-7b-instruct-f16.gguf" -> "qwen2.5-vl-7b-instruct-f16"
+//
+// It strips known suffixes like file extensions and common GGUF naming
+// patterns, then sanitizes for use as an Ollama model name.
+func deriveModelName(ggufPath string) string {
+	base := filepath.Base(ggufPath)
+
+	// Strip .gguf extension
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+
+	// Replace characters invalid in model names with hyphens
+	name = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '.' {
+			return r
+		}
+		return '-'
+	}, name)
+
+	// Collapse multiple hyphens and trim edges
+	for strings.Contains(name, "--") {
+		name = strings.ReplaceAll(name, "--", "-")
+	}
+	name = strings.Trim(name, "-.")
+
+	if name == "" {
+		name = "imported-model"
+	}
+
+	return name
 }
 
 func createRequestFileNames(files map[string]string) map[string]string {
@@ -2307,10 +2454,32 @@ func NewCLI() *cobra.Command {
 	}
 
 	createCmd.Flags().StringP("file", "f", "", "Name of the Modelfile (default \"Modelfile\")")
-	createCmd.Flags().String("gguf", "", "Path to GGUF file to import directly")
 	createCmd.Flags().StringP("quantize", "q", "", "Quantize model to this level (e.g. q4_K_M)")
 	createCmd.Flags().String("draft-quantize", "", "Quantize draft model to this level")
 	createCmd.Flags().Bool("experimental", false, "Enable experimental safetensors model creation")
+
+	importCmd := &cobra.Command{
+		Use:   "import GGUF_FILE",
+		Short: "Import a GGUF model file",
+		Long: `Import a GGUF model file directly into Ollama.
+
+The model name is automatically derived from the filename, or can be
+specified with --name. For vision models, use --mmproj to include the
+multimodal projector file.
+
+Examples:
+  ollama import model.gguf
+  ollama import model.gguf --name mymodel
+  ollama import model.gguf --mmproj vision-projector.gguf
+  ollama import model.gguf --quantize q4_K_M`,
+		Args:    cobra.ExactArgs(1),
+		PreRunE: checkServerHeartbeat,
+		RunE:    ImportHandler,
+	}
+
+	importCmd.Flags().StringP("name", "n", "", "Model name (default: derived from filename)")
+	importCmd.Flags().String("mmproj", "", "Path to multimodal projector GGUF file for vision models")
+	importCmd.Flags().StringP("quantize", "q", "", "Quantize model to this level (e.g. q4_K_M)")
 
 	showCmd := &cobra.Command{
 		Use:     "show MODEL",
@@ -2480,6 +2649,7 @@ func NewCLI() *cobra.Command {
 
 	for _, cmd := range []*cobra.Command{
 		createCmd,
+		importCmd,
 		showCmd,
 		runCmd,
 		stopCmd,
@@ -2527,6 +2697,7 @@ func NewCLI() *cobra.Command {
 	rootCmd.AddCommand(
 		serveCmd,
 		createCmd,
+		importCmd,
 		showCmd,
 		runCmd,
 		stopCmd,
