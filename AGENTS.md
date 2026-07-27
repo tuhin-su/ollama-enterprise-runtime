@@ -13,6 +13,8 @@ cmake --build build --parallel 8
 For quick Go-only iteration against an existing native payload:
 
 ```sh
+export CGO_CFLAGS="-I$(pwd)/include"
+export CGO_LDFLAGS="$(pwd)/lib/linux_amd64/liblancedb_go.a -lm"
 go build .
 go run . serve
 ```
