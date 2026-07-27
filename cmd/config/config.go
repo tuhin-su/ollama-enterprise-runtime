@@ -26,6 +26,7 @@ type config struct {
 	Integrations  map[string]*integration `json:"integrations"`
 	LastModel     string                  `json:"last_model,omitempty"`
 	LastSelection string                  `json:"last_selection,omitempty"` // "run" or integration name
+	Host          string                  `json:"host,omitempty"`
 }
 
 func configPath() (string, error) {
@@ -94,20 +95,37 @@ func load() (*config, error) {
 			data, err = os.ReadFile(path)
 		}
 	}
+	var cfg config
+	dirty := false
+
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &config{Integrations: make(map[string]*integration)}, nil
+			cfg = config{
+				Integrations: make(map[string]*integration),
+				Host:         "127.0.0.1:11434",
+			}
+			dirty = true
+		} else {
+			return nil, err
 		}
-		return nil, err
+	} else {
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return nil, fmt.Errorf("failed to parse config: %w, at: %s", err, path)
+		}
+		if cfg.Integrations == nil {
+			cfg.Integrations = make(map[string]*integration)
+			dirty = true
+		}
+		if cfg.Host == "" {
+			cfg.Host = "127.0.0.1:11434"
+			dirty = true
+		}
 	}
 
-	var cfg config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse config: %w, at: %s", err, path)
+	if dirty {
+		_ = save(&cfg)
 	}
-	if cfg.Integrations == nil {
-		cfg.Integrations = make(map[string]*integration)
-	}
+
 	return &cfg, nil
 }
 

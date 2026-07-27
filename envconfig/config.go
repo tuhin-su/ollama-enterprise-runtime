@@ -17,12 +17,102 @@ import (
 	"time"
 )
 
-// Host returns the scheme and host. Host can be configured via the OLLAMA_HOST environment variable.
+func generateServerConfigIfNotExist(home string) {
+	path := filepath.Join(home, ".ollama", "server.json")
+	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
+		defaultServerCfg := `{
+  "api_token": "",
+  "disable_ollama_cloud": false,
+  "memory": {
+    "enabled": false,
+    "db_path": "",
+    "embedding_model": "nomic-embed-text",
+    "top_k": 20,
+    "similarity_threshold": 0.65,
+    "importance_threshold": 0.3,
+    "decay_rate": 0.01,
+    "cache_size": 10000,
+    "cache_max_cost": 67108864,
+    "cache_ttl": "5m",
+    "worker_count": 4,
+    "max_prompt_memories": 10,
+    "max_prompt_tokens": 2048,
+    "decay_interval_hours": 24,
+    "archive_after_days": 90,
+    "ranking": {
+      "similarity": 0.4,
+      "importance": 0.25,
+      "recency": 0.2,
+      "frequency": 0.1,
+      "pinned": 0.05
+    }
+  }
+}`
+		dbPath := filepath.Join(home, ".ollama", "memory.lance")
+		var m map[string]any
+		if err := json.Unmarshal([]byte(defaultServerCfg), &m); err == nil {
+			if mem, ok := m["memory"].(map[string]any); ok {
+				mem["db_path"] = dbPath
+			}
+			if updated, err := json.MarshalIndent(m, "", "  "); err == nil {
+				_ = os.MkdirAll(filepath.Dir(path), 0o755)
+				_ = os.WriteFile(path, updated, 0o644)
+			}
+		}
+	}
+}
+
+func getHostFromConfig() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	generateServerConfigIfNotExist(home)
+	path := filepath.Join(home, ".ollama", "config.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			defaultCfg := `{
+  "integrations": {},
+  "host": "127.0.0.1:11434"
+}`
+			_ = os.MkdirAll(filepath.Dir(path), 0o755)
+			_ = os.WriteFile(path, []byte(defaultCfg), 0o644)
+			return "127.0.0.1:11434"
+		}
+		return ""
+	}
+	var cfg struct {
+		Host string `json:"host"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return ""
+	}
+	if strings.TrimSpace(cfg.Host) == "" {
+		var m map[string]any
+		if err := json.Unmarshal(data, &m); err == nil {
+			if m == nil {
+				m = make(map[string]any)
+			}
+			m["host"] = "127.0.0.1:11434"
+			if updated, err := json.MarshalIndent(m, "", "  "); err == nil {
+				_ = os.WriteFile(path, updated, 0o644)
+			}
+		}
+		return "127.0.0.1:11434"
+	}
+	return strings.TrimSpace(cfg.Host)
+}
+
+// Host returns the scheme and host. Host can be configured via ~/.ollama/config.json or the OLLAMA_HOST environment variable.
 // Default is scheme "http" and host "127.0.0.1:11434"
 func Host() *url.URL {
 	defaultPort := "11434"
 
-	s := strings.TrimSpace(Var("OLLAMA_HOST"))
+	s := getHostFromConfig()
+	if s == "" {
+		s = strings.TrimSpace(Var("OLLAMA_HOST"))
+	}
 	scheme, hostport, ok := strings.Cut(s, "://")
 	switch {
 	case !ok:
