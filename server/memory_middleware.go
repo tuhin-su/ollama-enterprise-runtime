@@ -49,8 +49,13 @@ func shutdownMemoryEngine() {
 //
 // Returns the (possibly modified) message slice. Always safe — never panics
 // and never blocks inference if the memory engine is down.
-func injectMemoryIntoMessages(ctx context.Context, userID string, req *api.ChatRequest, msgs []api.Message) []api.Message {
+func injectMemoryIntoMessages(ctx context.Context, userID string, req *api.ChatRequest, msgs []api.Message, hasTools bool) []api.Message {
 	if memoryEngine == nil || userID == "" {
+		return msgs
+	}
+
+	if hasTools {
+		req.Tools = append(req.Tools, GetMemoryTools()...)
 		return msgs
 	}
 

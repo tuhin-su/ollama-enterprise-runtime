@@ -41,13 +41,6 @@ The official [Ollama Docker image](https://hub.docker.com/r/ollama/ollama) `olla
 
 - [ollama-python](https://github.com/ollama/ollama-python)
 - [ollama-js](https://github.com/ollama/ollama-js)
-
-### Community
-
-- [Discord](https://discord.gg/ollama)
-- [𝕏 (Twitter)](https://x.com/ollama)
-- [Reddit](https://reddit.com/r/ollama)
-
 ## Get started
 
 ```

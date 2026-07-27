@@ -13,8 +13,8 @@ type Config struct {
 	// Enabled activates the memory middleware. Default false.
 	Enabled bool `json:"enabled"`
 
-	// DBPath is the SQLite database file.
-	// Default: ~/.ollama/memory.db
+	// DBPath is the LanceDB database directory.
+	// Default: ~/.ollama/memory.lance
 	DBPath string `json:"db_path,omitempty"`
 
 	// EmbeddingModel is the Ollama model used for embedding generation.
@@ -108,7 +108,7 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 // DefaultConfig returns a Config with production-ready defaults.
 func DefaultConfig() Config {
 	home, _ := os.UserHomeDir()
-	dbPath := filepath.Join(home, ".ollama", "memory.db")
+	dbPath := filepath.Join(home, ".ollama", "memory.lance")
 
 	return Config{
 		Enabled:             false,

@@ -16,3 +16,9 @@ llama/build
 llama/vendor
 /ollama
 integration/testdata/models/
+
+# LanceDB CGO bindings and local databases
+/include/lancedb.h
+/lib/
+*.lance
+

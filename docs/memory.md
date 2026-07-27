@@ -31,7 +31,7 @@ User sends message
 │   Background Worker         │
 │  • Extracts new facts       │  ← async, zero latency impact
 │  • Generates embeddings     │
-│  • Persists to SQLite       │
+│  • Persists to LanceDB      │
 └─────────────────────────────┘
 ```
 
@@ -121,7 +121,7 @@ All options live under the `"memory"` key in `~/.ollama/server.json`.
 | Option | Default | Description |
 |--------|---------|-------------|
 | `enabled` | `false` | Master switch. Must be `true` to activate. |
-| `db_path` | `~/.ollama/memory.db` | Path to the SQLite database file. |
+| `db_path` | `~/.ollama/memory.lance` | Path to the LanceDB database directory. |
 | `embedding_model` | `nomic-embed-text` | Ollama model used to generate embeddings. |
 | `top_k` | `20` | Number of candidates retrieved from vector search before ranking. |
 | `similarity_threshold` | `0.65` | Minimum cosine similarity (0–1) for a memory to be considered relevant. |
@@ -154,21 +154,21 @@ All weights are tunable under `"ranking"` in the config.
 
 ## Storage
 
-Memory is stored in a single SQLite file (default `~/.ollama/memory.db`):
+Memory is stored in a LanceDB database directory (default `~/.ollama/memory.lance`):
 
-- **WAL mode** — fast concurrent reads
-- **Foreign keys enabled** — referential integrity
-- **5 tables**: `memories`, `tags`, `memory_tags`, `conversations`, `summaries`
-- **Embeddings** stored as binary little-endian float32 blobs
+- **Columnar Format** — high performance vector search
+- **Apache Arrow** — zero-copy memory operations
+- **Vector search index** — scalable Approximate Nearest Neighbors (ANN)
+- **Tags and Metadata** stored in Lance tables along with float32 embeddings
 
-The file is fully portable — copy it between machines to transfer memories.
+The directory is fully portable — copy it between machines to transfer memories.
 
 ---
 
 ## Caching
 
 An in-process [Ristretto](https://github.com/dgraph-io/ristretto) cache sits in
-front of SQLite for hot-path performance:
+front of LanceDB for hot-path performance:
 
 | Cache Key | Contents | TTL |
 |-----------|----------|-----|
@@ -176,7 +176,7 @@ front of SQLite for hot-path performance:
 | `search:<userID>:<query>` | Top-K search results | 2 min |
 | `user:<userID>` | User-level metadata | 5 min |
 
-Cache hits complete in **~80 ns**. SQLite queries take ~100 µs. The cache
+Cache hits complete in **~80 ns**. LanceDB queries take ~100 µs. The cache
 ensures repeated queries in the same session have near-zero overhead.
 
 ---

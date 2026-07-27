@@ -32,6 +32,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ollama/ollama/api"
+	"github.com/ollama/ollama/server/memory"
 	"github.com/ollama/ollama/auth"
 	"github.com/ollama/ollama/discover"
 	"github.com/ollama/ollama/envconfig"
@@ -2639,7 +2640,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	}
 
 	caps := []model.Capability{model.CapabilityCompletion}
-	if len(req.Tools) > 0 {
+	if len(req.Tools) > 0 || memoryEngine != nil {
 		caps = append(caps, model.CapabilityTools)
 	}
 
@@ -2692,7 +2693,8 @@ func (s *Server) ChatHandler(c *gin.Context) {
 
 	// --- Memory subsystem: enrich messages with long-term memory context ---
 	memUID := memoryUserID(&req, c.Request.RemoteAddr)
-	msgs = injectMemoryIntoMessages(c.Request.Context(), memUID, &req, msgs)
+	hasTools := slices.Contains(m.Capabilities(), model.CapabilityTools)
+	msgs = injectMemoryIntoMessages(c.Request.Context(), memUID, &req, msgs, hasTools)
 	// -----------------------------------------------------------------------
 
 	if shouldUseHarmony(m) {
@@ -3028,42 +3030,147 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 	go func() {
 		defer close(ch)
 
-		err := r.Chat(c.Request.Context(), nativeReq, func(r llm.ChatResponse) {
-			res := api.ChatResponse{
-				Model:     req.Model,
-				CreatedAt: time.Now().UTC(),
-				Message:   r.Message,
-				Done:      r.Done,
-				Metrics: api.Metrics{
-					PromptEvalCount:    r.PromptEvalCount,
-					PromptEvalDuration: r.PromptEvalDuration,
-					EvalCount:          r.EvalCount,
-					EvalDuration:       r.EvalDuration,
-				},
-				Logprobs: toAPILogprobs(r.Logprobs),
-			}
+		memUID := memoryUserID(&req, c.Request.RemoteAddr)
 
-			if res.Message.Role == "" {
-				res.Message.Role = "assistant"
-			}
-
-			if r.Done {
-				res.DoneReason = r.DoneReason.String()
-				res.TotalDuration = time.Since(checkpointStart)
-				res.LoadDuration = checkpointLoaded.Sub(checkpointStart)
-			}
-
-			ch <- res
-		})
-		if err != nil {
-			s.sched.expireRunnersForRuntimeOOM(m, err)
-			var serr api.StatusError
-			if errors.As(err, &serr) {
-				ch <- gin.H{"error": serr.ErrorMessage, "status": serr.StatusCode}
-			} else {
+		var runChat func(currentMessages []api.Message)
+		runChat = func(currentMessages []api.Message) {
+			nativeReq.Messages = currentMessages
+			preparedReq, err := prepareNativeChatRequest(c.Request.Context(), m, r, opts, nativeReq, truncate)
+			if err != nil {
 				ch <- gin.H{"error": err.Error()}
+				return
+			}
+
+			var fullMessage api.Message
+			var doneResponse api.ChatResponse
+			hasSentChunks := false
+
+			err = r.Chat(c.Request.Context(), preparedReq, func(resp llm.ChatResponse) {
+				res := api.ChatResponse{
+					Model:     req.Model,
+					CreatedAt: time.Now().UTC(),
+					Message:   resp.Message,
+					Done:      resp.Done,
+					Metrics: api.Metrics{
+						PromptEvalCount:    resp.PromptEvalCount,
+						PromptEvalDuration: resp.PromptEvalDuration,
+						EvalCount:          resp.EvalCount,
+						EvalDuration:       resp.EvalDuration,
+					},
+					Logprobs: toAPILogprobs(resp.Logprobs),
+				}
+				if res.Message.Role == "" {
+					res.Message.Role = "assistant"
+				}
+				if resp.Done {
+					res.DoneReason = resp.DoneReason.String()
+					res.TotalDuration = time.Since(checkpointStart)
+					res.LoadDuration = checkpointLoaded.Sub(checkpointStart)
+					doneResponse = res
+				}
+
+				// Accumulate full message
+				if resp.Message.Content != "" {
+					fullMessage.Content += resp.Message.Content
+				}
+				if resp.Message.Thinking != "" {
+					fullMessage.Thinking += resp.Message.Thinking
+				}
+				if len(resp.Message.ToolCalls) > 0 {
+					fullMessage.ToolCalls = append(fullMessage.ToolCalls, resp.Message.ToolCalls...)
+				}
+
+				// Check if there are memory tool calls in this chunk or in the accumulated message
+				hasMemoryTool := false
+				for _, tc := range fullMessage.ToolCalls {
+					if IsMemoryTool(tc.Function.Name) {
+						hasMemoryTool = true
+						break
+					}
+				}
+
+				// If there's a memory tool call, we suppress streaming it to the client
+				if !hasMemoryTool {
+					hasSentChunks = true
+					ch <- res
+				}
+			})
+
+			if err != nil {
+				s.sched.expireRunnersForRuntimeOOM(m, err)
+				var serr api.StatusError
+				if errors.As(err, &serr) {
+					ch <- gin.H{"error": serr.ErrorMessage, "status": serr.StatusCode}
+				} else {
+					ch <- gin.H{"error": err.Error()}
+				}
+				return
+			}
+
+			// Check if we have memory tool calls to execute
+			var memoryCalls []api.ToolCall
+			for _, tc := range fullMessage.ToolCalls {
+				if IsMemoryTool(tc.Function.Name) {
+					memoryCalls = append(memoryCalls, tc)
+				}
+			}
+
+			if len(memoryCalls) > 0 {
+				fullMessage.Role = "assistant"
+				newMessages := append(currentMessages, fullMessage)
+
+				for _, tc := range memoryCalls {
+					resultStr, err := ExecuteMemoryTool(c.Request.Context(), memUID, tc)
+					if err != nil {
+						resultStr = fmt.Sprintf(`{"error": %q}`, err.Error())
+					}
+					newMessages = append(newMessages, api.Message{
+						Role:       "tool",
+						Content:    resultStr,
+						ToolCallID: tc.ID,
+					})
+				}
+
+				// Re-run chat with the new history
+				runChat(newMessages)
+				return
+			}
+
+			// Save conversation turn when final assistant response is ready and no memory tool calls remain
+			if doneResponse.Done && memoryEngine != nil {
+				var lastUserMsg string
+				for i := len(currentMessages) - 1; i >= 0; i-- {
+					if currentMessages[i].Role == "user" {
+						lastUserMsg = currentMessages[i].Content
+						break
+					}
+				}
+
+				conv := &memory.Conversation{
+					UserID:           memUID,
+					Model:            req.Model,
+					UserMessage:      lastUserMsg,
+					AssistantMessage: fullMessage.Content,
+					Thinking:         fullMessage.Thinking,
+					Timestamp:        time.Now().UTC(),
+				}
+
+				go func() {
+					store := memoryEngine.Store()
+					if err := store.SaveConversation(context.Background(), conv); err != nil {
+						slog.Warn("failed to save conversation turn", "error", err)
+					}
+				}()
+			}
+
+			// If we suppressed chunks due to no memory tool call or if it was the final turn,
+			// make sure to send the final done response if we didn't send anything.
+			if !hasSentChunks && doneResponse.Done {
+				ch <- doneResponse
 			}
 		}
+
+		runChat(msgs)
 	}()
 
 	writeChatResponse(c, req, ch)

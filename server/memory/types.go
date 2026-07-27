@@ -37,6 +37,28 @@ type Memory struct {
 	LastAccessed time.Time  `json:"last_accessed"`
 }
 
+// Conversation represents a chat history turn.
+type Conversation struct {
+	ID               string    `json:"id"`
+	UserID           string    `json:"user_id"`
+	Model            string    `json:"model"`
+	UserMessage      string    `json:"user_message"`
+	AssistantMessage string    `json:"assistant_message"`
+	Thinking         string    `json:"thinking,omitempty"`
+	Timestamp        time.Time `json:"timestamp"`
+}
+
+// SpecialMemory represents a memory block managed directly by the AI.
+type SpecialMemory struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Key       string    `json:"key"`
+	Value     string    `json:"value"`
+	Embedding []float32 `json:"-"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // SearchResult pairs a memory with its computed relevance score.
 type SearchResult struct {
 	Memory     *Memory `json:"memory"`
@@ -114,6 +136,12 @@ type MemoryStore interface {
 	CountByUser(ctx context.Context, userID string) (int64, error)
 	ArchiveOlderThan(ctx context.Context, before time.Time, minImportance float64) (int64, error)
 	Close() error
+	// Conversation methods
+	SaveConversation(ctx context.Context, conv *Conversation) error
+	// SpecialMemory methods
+	SaveSpecialMemory(ctx context.Context, mem *SpecialMemory) error
+	ListSpecialMemories(ctx context.Context, userID string) ([]*SpecialMemory, error)
+	DeleteSpecialMemory(ctx context.Context, id string) error
 }
 
 // VectorIndex performs approximate nearest-neighbour search on embeddings.
@@ -162,4 +190,8 @@ type MemoryEngine interface {
 	Healthy(ctx context.Context) error
 	// Close shuts down background workers and releases resources.
 	Close() error
+	// Store returns the underlying persistent memory store.
+	Store() MemoryStore
+	// Embed generates an embedding for a piece of text using the engine's embedder.
+	Embed(ctx context.Context, text string) ([]float32, error)
 }

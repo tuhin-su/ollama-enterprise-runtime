@@ -33,8 +33,8 @@ type Engine struct {
 // NewEngine constructs an Engine from the given Config, using production
 // implementations for every component.
 func NewEngine(cfg Config) (*Engine, error) {
-	// SQLite store
-	store, err := NewSQLiteStore(cfg.DBPath)
+	// LanceDB store
+	store, err := NewLanceDBStore(cfg.DBPath)
 	if err != nil {
 		return nil, fmt.Errorf("memory engine: store: %w", err)
 	}
@@ -261,6 +261,16 @@ func (e *Engine) Close() error {
 		slog.Warn("memory engine: index close", "error", err)
 	}
 	return e.store.Close()
+}
+
+// Store returns the underlying persistent memory store.
+func (e *Engine) Store() MemoryStore {
+	return e.store
+}
+
+// Embed generates an embedding for a piece of text.
+func (e *Engine) Embed(ctx context.Context, text string) ([]float32, error) {
+	return e.embedder.Embed(ctx, text)
 }
 
 // -- internal helpers --

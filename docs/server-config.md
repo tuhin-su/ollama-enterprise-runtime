@@ -113,7 +113,7 @@ See [memory.md](memory.md) for the full reference.
 |-----|------|---------|-------------|
 | `api_token` | string | `""` | Bearer token for API authentication. Empty = no auth. |
 | `memory.enabled` | bool | `false` | Enable long-term memory system. |
-| `memory.db_path` | string | `~/.ollama/memory.db` | SQLite database path. |
+| `memory.db_path` | string | `~/.ollama/memory.lance` | LanceDB database path. |
 | `memory.embedding_model` | string | `nomic-embed-text` | Model for generating embeddings. |
 | `memory.top_k` | int | `20` | Vector search candidates before ranking. |
 | `memory.similarity_threshold` | float | `0.65` | Minimum cosine similarity (0–1). |
