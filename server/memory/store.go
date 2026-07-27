@@ -886,3 +886,74 @@ func (s *LanceDBStore) DeleteSpecialMemory(ctx context.Context, id string) error
 	escapedID := strings.ReplaceAll(id, "'", "''")
 	return table.Delete(ctx, fmt.Sprintf("id = '%s'", escapedID))
 }
+
+func mapToConversation(row map[string]interface{}) *Conversation {
+	var conv Conversation
+	if val, ok := row["id"].(string); ok {
+		conv.ID = val
+	}
+	if val, ok := row["user_id"].(string); ok {
+		conv.UserID = val
+	}
+	if val, ok := row["model"].(string); ok {
+		conv.Model = val
+	}
+	if val, ok := row["user_message"].(string); ok {
+		conv.UserMessage = val
+	}
+	if val, ok := row["assistant_message"].(string); ok {
+		conv.AssistantMessage = val
+	}
+	if val, ok := row["thinking"].(string); ok {
+		conv.Thinking = val
+	}
+	if val, ok := row["timestamp"].(string); ok {
+		conv.Timestamp, _ = time.Parse(time.RFC3339Nano, val)
+	}
+	return &conv
+}
+
+// Export retrieves all records across all tables (memories, conversations, special_memories)
+func (s *LanceDBStore) Export(ctx context.Context) ([]*Memory, []*Conversation, []*SpecialMemory, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var memories []*Memory
+	memTable, err := s.conn.OpenTable(ctx, "memories")
+	if err == nil {
+		defer memTable.Close()
+		rows, err := memTable.Select(ctx, contracts.QueryConfig{})
+		if err == nil {
+			for _, row := range rows {
+				memories = append(memories, mapToMemory(row))
+			}
+		}
+	}
+
+	var conversations []*Conversation
+	convTable, err := s.conn.OpenTable(ctx, "conversations")
+	if err == nil {
+		defer convTable.Close()
+		rows, err := convTable.Select(ctx, contracts.QueryConfig{})
+		if err == nil {
+			for _, row := range rows {
+				conversations = append(conversations, mapToConversation(row))
+			}
+		}
+	}
+
+	var specialMemories []*SpecialMemory
+	specTable, err := s.conn.OpenTable(ctx, "special_memories")
+	if err == nil {
+		defer specTable.Close()
+		rows, err := specTable.Select(ctx, contracts.QueryConfig{})
+		if err == nil {
+			for _, row := range rows {
+				specialMemories = append(specialMemories, mapToSpecialMemory(row))
+			}
+		}
+	}
+
+	return memories, conversations, specialMemories, nil
+}
+

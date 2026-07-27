@@ -27,7 +27,7 @@ type Memory struct {
 	Content      string     `json:"content"`
 	Summary      string     `json:"summary,omitempty"`
 	Importance   float64    `json:"importance"`
-	Embedding    []float32  `json:"-"`
+	Embedding    []float32  `json:"embedding,omitempty"`
 	Tags         []string   `json:"tags,omitempty"`
 	AccessCount  int64      `json:"access_count"`
 	Pinned       bool       `json:"pinned"`
@@ -54,7 +54,7 @@ type SpecialMemory struct {
 	UserID    string    `json:"user_id"`
 	Key       string    `json:"key"`
 	Value     string    `json:"value"`
-	Embedding []float32 `json:"-"`
+	Embedding []float32 `json:"embedding,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -142,6 +142,8 @@ type MemoryStore interface {
 	SaveSpecialMemory(ctx context.Context, mem *SpecialMemory) error
 	ListSpecialMemories(ctx context.Context, userID string) ([]*SpecialMemory, error)
 	DeleteSpecialMemory(ctx context.Context, id string) error
+	// Export/Import helper
+	Export(ctx context.Context) ([]*Memory, []*Conversation, []*SpecialMemory, error)
 }
 
 // VectorIndex performs approximate nearest-neighbour search on embeddings.

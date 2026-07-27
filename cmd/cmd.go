@@ -51,6 +51,7 @@ import (
 	"github.com/ollama/ollama/readline"
 	"github.com/ollama/ollama/runner"
 	"github.com/ollama/ollama/server"
+	"github.com/ollama/ollama/server/memory"
 	"github.com/ollama/ollama/types/model"
 	"github.com/ollama/ollama/types/syncmap"
 	"github.com/ollama/ollama/version"
@@ -429,8 +430,77 @@ func CreateHandler(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func importMemory(ctx context.Context, srcPath string) error {
+	absSrcPath, err := filepath.Abs(srcPath)
+	if err != nil {
+		return fmt.Errorf("invalid source path: %w", err)
+	}
+
+	data, err := os.ReadFile(absSrcPath)
+	if err != nil {
+		return fmt.Errorf("failed to read source file: %w", err)
+	}
+
+	var exp struct {
+		Memories        []*memory.Memory        `json:"memories"`
+		Conversations   []*memory.Conversation   `json:"conversations"`
+		SpecialMemories []*memory.SpecialMemory `json:"special_memories"`
+	}
+	if err := json.Unmarshal(data, &exp); err != nil {
+		return fmt.Errorf("failed to parse memory JSON (note: only JSON format memory imports are supported): %w", err)
+	}
+
+	cfg := memory.LoadConfig()
+	store, err := memory.NewLanceDBStore(cfg.DBPath)
+	if err != nil {
+		return fmt.Errorf("failed to open memory store: %w", err)
+	}
+	defer store.Close()
+
+	// Import Memories
+	importedMems := 0
+	for _, mem := range exp.Memories {
+		if err := store.Save(ctx, mem); err != nil {
+			slog.Warn("failed to import memory entry", "id", mem.ID, "error", err)
+			continue
+		}
+		importedMems++
+	}
+
+	// Import Special Memories
+	importedSpecs := 0
+	for _, spec := range exp.SpecialMemories {
+		if err := store.SaveSpecialMemory(ctx, spec); err != nil {
+			slog.Warn("failed to import special memory entry", "id", spec.ID, "error", err)
+			continue
+		}
+		importedSpecs++
+	}
+
+	// Import Conversations
+	importedConvs := 0
+	for _, conv := range exp.Conversations {
+		if err := store.SaveConversation(ctx, conv); err != nil {
+			slog.Warn("failed to import conversation entry", "id", conv.ID, "error", err)
+			continue
+		}
+		importedConvs++
+	}
+
+	fmt.Printf("Memory successfully imported from %s:\n", absSrcPath)
+	fmt.Printf("  - %d memories\n", importedMems)
+	fmt.Printf("  - %d special memories\n", importedSpecs)
+	fmt.Printf("  - %d conversations\n", importedConvs)
+	return nil
+}
+
 // ImportHandler handles the `ollama import` command for importing GGUF files directly.
 func ImportHandler(cmd *cobra.Command, args []string) error {
+	memoryPath, _ := cmd.Flags().GetString("memory")
+	if memoryPath != "" {
+		return importMemory(cmd.Context(), memoryPath)
+	}
+
 	p := progress.NewProgress(os.Stderr)
 	defer p.Stop()
 
@@ -588,8 +658,99 @@ func deriveModelName(ggufPath string) string {
 	return name
 }
 
+func exportMemory(ctx context.Context, destPath, format string) error {
+	cfg := memory.LoadConfig()
+	store, err := memory.NewLanceDBStore(cfg.DBPath)
+	if err != nil {
+		return fmt.Errorf("failed to open memory store: %w", err)
+	}
+	defer store.Close()
+
+	mems, convs, specs, err := store.Export(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to export memory: %w", err)
+	}
+
+	absDestPath, err := filepath.Abs(destPath)
+	if err != nil {
+		return fmt.Errorf("invalid destination path: %w", err)
+	}
+
+	// Ensure destination directory exists if writing to a file in a dir
+	destDir := filepath.Dir(absDestPath)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	if format == "json" {
+		exp := struct {
+			Memories        []*memory.Memory        `json:"memories"`
+			Conversations   []*memory.Conversation   `json:"conversations"`
+			SpecialMemories []*memory.SpecialMemory `json:"special_memories"`
+		}{
+			Memories:        mems,
+			Conversations:   convs,
+			SpecialMemories: specs,
+		}
+		data, err := json.MarshalIndent(exp, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal memory to JSON: %w", err)
+		}
+		if err := os.WriteFile(absDestPath, data, 0644); err != nil {
+			return fmt.Errorf("failed to write memory to file: %w", err)
+		}
+	} else {
+		// Default human readable text format
+		var sb strings.Builder
+		sb.WriteString("=== MEMORIES ===\n")
+		for _, mem := range mems {
+			sb.WriteString(fmt.Sprintf("ID: %s | User: %s | Type: %s | Importance: %.2f\n", mem.ID, mem.UserID, mem.Type, mem.Importance))
+			sb.WriteString(fmt.Sprintf("Content: %s\n", mem.Content))
+			if mem.Summary != "" {
+				sb.WriteString(fmt.Sprintf("Summary: %s\n", mem.Summary))
+			}
+			if len(mem.Tags) > 0 {
+				sb.WriteString(fmt.Sprintf("Tags: %s\n", strings.Join(mem.Tags, ", ")))
+			}
+			sb.WriteString(fmt.Sprintf("Created: %s\n", mem.CreatedAt.Format(time.RFC3339)))
+			sb.WriteString("------------------------------------------------------------\n")
+		}
+
+		sb.WriteString("\n=== SPECIAL MEMORIES ===\n")
+		for _, spec := range specs {
+			sb.WriteString(fmt.Sprintf("ID: %s | User: %s | Key: %s\n", spec.ID, spec.UserID, spec.Key))
+			sb.WriteString(fmt.Sprintf("Value: %s\n", spec.Value))
+			sb.WriteString("------------------------------------------------------------\n")
+		}
+
+		sb.WriteString("\n=== CONVERSATIONS ===\n")
+		for _, conv := range convs {
+			sb.WriteString(fmt.Sprintf("ID: %s | User: %s | Model: %s | Timestamp: %s\n", conv.ID, conv.UserID, conv.Model, conv.Timestamp.Format(time.RFC3339)))
+			sb.WriteString(fmt.Sprintf("User: %s\n", conv.UserMessage))
+			sb.WriteString(fmt.Sprintf("Assistant: %s\n", conv.AssistantMessage))
+			if conv.Thinking != "" {
+				sb.WriteString(fmt.Sprintf("Thinking: %s\n", conv.Thinking))
+			}
+			sb.WriteString("------------------------------------------------------------\n")
+		}
+
+		if err := os.WriteFile(absDestPath, []byte(sb.String()), 0644); err != nil {
+			return fmt.Errorf("failed to write memory to file: %w", err)
+		}
+	}
+
+	fmt.Printf("Memory successfully exported to %s in %s format.\n", absDestPath, format)
+	return nil
+}
+
 // ExportHandler handles exporting a model's GGUF file(s) back out of Ollama.
 func ExportHandler(cmd *cobra.Command, args []string) error {
+	memoryPath, _ := cmd.Flags().GetString("memory")
+	if memoryPath != "" {
+		format, _ := cmd.Flags().GetString("format")
+		return exportMemory(cmd.Context(), memoryPath, format)
+	}
+
 	modelName := args[0]
 	destPath := args[1]
 
@@ -2542,45 +2703,74 @@ func NewCLI() *cobra.Command {
 
 	importCmd := &cobra.Command{
 		Use:   "import GGUF_FILE",
-		Short: "Import a GGUF model file",
-		Long: `Import a GGUF model file directly into Ollama.
+		Short: "Import a GGUF model file or memory database",
+		Long: `Import a GGUF model file directly into Ollama, or import a memory database.
 
 The model name is automatically derived from the filename, or can be
 specified with --name. For vision models, use --mmproj to include the
 multimodal projector file.
+
+To import memory:
+  ollama import --memory path/to/memory.json
 
 Examples:
   ollama import model.gguf
   ollama import model.gguf --name mymodel
   ollama import model.gguf --mmproj vision-projector.gguf
   ollama import model.gguf --quantize q4_K_M`,
-		Args:    cobra.ExactArgs(1),
-		PreRunE: checkServerHeartbeat,
+		Args: func(cmd *cobra.Command, args []string) error {
+			if memory, _ := cmd.Flags().GetString("memory"); memory != "" {
+				return cobra.NoArgs(cmd, args)
+			}
+			return cobra.ExactArgs(1)(cmd, args)
+		},
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if memory, _ := cmd.Flags().GetString("memory"); memory != "" {
+				return nil
+			}
+			return checkServerHeartbeat(cmd, args)
+		},
 		RunE:    ImportHandler,
 	}
 
 	importCmd.Flags().StringP("name", "n", "", "Model name (default: derived from filename)")
 	importCmd.Flags().String("mmproj", "", "Path to multimodal projector GGUF file for vision models")
 	importCmd.Flags().StringP("quantize", "q", "", "Quantize model to this level (e.g. q4_K_M)")
+	importCmd.Flags().String("memory", "", "Import memory database from this JSON file path")
 
 	exportCmd := &cobra.Command{
 		Use:   "export MODEL DESTINATION",
-		Short: "Export a model back to a GGUF file",
-		Long: `Export a model's GGUF file(s) from Ollama's local storage to a specified destination.
+		Short: "Export a model back to a GGUF file or export memory database",
+		Long: `Export a model's GGUF file(s) from Ollama's local storage to a specified destination, or export memory database.
 
 If the model is a Vision-Language (VL) model, the multimodal projector (mmproj) file
 will also be exported.
+
+To export memory:
+  ollama export --memory path/to/memory.json --format json
 
 Examples:
   ollama export mymodel model.gguf
   ollama export mymodel /path/to/directory/
   ollama export mymodel model.gguf --mmproj vision-projector.gguf`,
-		Args:    cobra.ExactArgs(2),
-		PreRunE: checkServerHeartbeat,
+		Args: func(cmd *cobra.Command, args []string) error {
+			if memory, _ := cmd.Flags().GetString("memory"); memory != "" {
+				return cobra.NoArgs(cmd, args)
+			}
+			return cobra.ExactArgs(2)(cmd, args)
+		},
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if memory, _ := cmd.Flags().GetString("memory"); memory != "" {
+				return nil
+			}
+			return checkServerHeartbeat(cmd, args)
+		},
 		RunE:    ExportHandler,
 	}
 
 	exportCmd.Flags().String("mmproj", "", "Custom destination path for the multimodal projector file (optional)")
+	exportCmd.Flags().String("memory", "", "Export memory database to this path")
+	exportCmd.Flags().String("format", "default", "Format for memory export (json or default)")
 
 
 	showCmd := &cobra.Command{
