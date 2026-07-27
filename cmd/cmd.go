@@ -773,12 +773,6 @@ func MemoryHandler(cmd *cobra.Command, args []string) error {
 
 // ExportHandler handles exporting a model's GGUF file(s) back out of Ollama.
 func ExportHandler(cmd *cobra.Command, args []string) error {
-	memoryPath, _ := cmd.Flags().GetString("memory")
-	if memoryPath != "" {
-		format, _ := cmd.Flags().GetString("format")
-		return exportMemory(cmd.Context(), memoryPath, format)
-	}
-
 	modelName := args[0]
 	destPath := args[1]
 
@@ -2768,37 +2762,22 @@ Examples:
 
 	exportCmd := &cobra.Command{
 		Use:   "export MODEL DESTINATION",
-		Short: "Export a model back to a GGUF file or export memory database",
-		Long: `Export a model's GGUF file(s) from Ollama's local storage to a specified destination, or export memory database.
+		Short: "Export a model back to a GGUF file",
+		Long: `Export a model's GGUF file(s) from Ollama's local storage to a specified destination.
 
 If the model is a Vision-Language (VL) model, the multimodal projector (mmproj) file
 will also be exported.
-
-To export memory:
-  ollama export --memory path/to/memory.json --format json
 
 Examples:
   ollama export mymodel model.gguf
   ollama export mymodel /path/to/directory/
   ollama export mymodel model.gguf --mmproj vision-projector.gguf`,
-		Args: func(cmd *cobra.Command, args []string) error {
-			if memory, _ := cmd.Flags().GetString("memory"); memory != "" {
-				return cobra.NoArgs(cmd, args)
-			}
-			return cobra.ExactArgs(2)(cmd, args)
-		},
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if memory, _ := cmd.Flags().GetString("memory"); memory != "" {
-				return nil
-			}
-			return checkServerHeartbeat(cmd, args)
-		},
+		Args:    cobra.ExactArgs(2),
+		PreRunE: checkServerHeartbeat,
 		RunE:    ExportHandler,
 	}
 
 	exportCmd.Flags().String("mmproj", "", "Custom destination path for the multimodal projector file (optional)")
-	exportCmd.Flags().String("memory", "", "Export memory database to this path")
-	exportCmd.Flags().String("format", "default", "Format for memory export (json or default)")
 
 	memoryCmd := &cobra.Command{
 		Use:   "memory",
