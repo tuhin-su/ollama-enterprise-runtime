@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -867,4 +868,119 @@ func skillFrontMatter(input string) (skillFrontMatterMetadata, string, error) {
 		}
 	}
 	return skillFrontMatterMetadata{}, "", errors.New("front matter is not closed")
+}
+
+// ExportSkills copies the specified skill (or all skills if skillName is empty) to the destination directory.
+func ExportSkills(skillName, destinationDir string) error {
+	skillsDir, err := SkillsDir()
+	if err != nil {
+		return fmt.Errorf("resolve skills directory: %w", err)
+	}
+
+	absDest, err := filepath.Abs(destinationDir)
+	if err != nil {
+		return fmt.Errorf("invalid destination directory path: %w", err)
+	}
+
+	if err := os.MkdirAll(absDest, 0755); err != nil {
+		return fmt.Errorf("create destination directory: %w", err)
+	}
+
+	if skillName != "" {
+		// Export a specific skill
+		skillPath := filepath.Join(skillsDir, skillName)
+		info, err := os.Stat(skillPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("skill %q not found in %s", skillName, skillsDir)
+			}
+			return fmt.Errorf("stat skill %q: %w", skillName, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("skill %q is not a directory", skillName)
+		}
+		destPath := filepath.Join(absDest, skillName)
+		return copyImportTree(skillPath, destPath)
+	}
+
+	// Export all skills
+	entries, err := os.ReadDir(skillsDir)
+	if err != nil {
+		return fmt.Errorf("read skills directory: %w", err)
+	}
+
+	exportedCount := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			src := filepath.Join(skillsDir, entry.Name())
+			dst := filepath.Join(absDest, entry.Name())
+			if err := copyImportTree(src, dst); err != nil {
+				return fmt.Errorf("export skill %q failed: %w", entry.Name(), err)
+			}
+			exportedCount++
+		}
+	}
+	if exportedCount == 0 {
+		return fmt.Errorf("no skills found to export in %s", skillsDir)
+	}
+	return nil
+}
+
+// ImportSkillsFromSource imports skills from a source: 'claude', 'codex', 'pi', 'all', or a custom folder path.
+func ImportSkillsFromSource(source string) ([]SkillImportResult, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("resolve home directory: %w", err)
+	}
+
+	destination, err := SkillsDir()
+	if err != nil {
+		return nil, fmt.Errorf("resolve Ollama skills directory: %w", err)
+	}
+
+	roots := conventionalSkillImportRoots(home)
+	sourceClean := strings.ToLower(strings.TrimSpace(source))
+
+	if sourceClean == "all" || sourceClean == "" {
+		var results []SkillImportResult
+		for name, srcDir := range roots {
+			res, err := importSkillsFromDir(name, srcDir, destination)
+			if err != nil {
+				slog.Warn("import skills failed for source", "source", name, "error", err)
+				continue
+			}
+			if len(res.Imported) > 0 || len(res.Existing) > 0 || len(res.Failures) > 0 {
+				results = append(results, res)
+			}
+		}
+		return results, nil
+	}
+
+	// Check if it's a conventional name
+	if srcDir, ok := roots[sourceClean]; ok {
+		res, err := importSkillsFromDir(sourceClean, srcDir, destination)
+		if err != nil {
+			return nil, err
+		}
+		return []SkillImportResult{res}, nil
+	}
+
+	// Otherwise treat it as a custom path
+	absPath, err := filepath.Abs(source)
+	if err != nil {
+		return nil, fmt.Errorf("invalid source path: %w", err)
+	}
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return nil, fmt.Errorf("source path not found: %w", err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("source path is not a directory")
+	}
+
+	res, err := importSkillsFromDir("custom", absPath, destination)
+	if err != nil {
+		return nil, err
+	}
+	return []SkillImportResult{res}, nil
 }

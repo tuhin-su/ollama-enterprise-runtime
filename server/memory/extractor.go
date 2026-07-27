@@ -31,6 +31,12 @@ func NewPatternExtractor() *PatternExtractor {
 			`(?i)\bi('m| am)\s+\d+\s+years?\s+old`,
 			`(?i)\bi (have|got)\s+(a\s+)?(dog|cat|pet|kid|child|car)`,
 			`(?i)\bi (study|studied|graduated)\s+`,
+			`(?i)\buser\s+\d+\s+lives\s+(in|at|near)\s+`,
+			`(?i)\buser\s+\d+\s+works\s+(at|for|as|in)\s+`,
+			`(?i)\buser\s+\d+('s)?\s+favorite color\s+is\s+`,
+			`(?i)\buser\s+\d+\s+(owns|has|got)\s+`,
+			`(?i)\buser\s+\d+\s+(went|visited|travelled)\s+to\s+`,
+			`(?i)\bsecret pin code for user\s+\d+\s+is\s+`,
 		),
 		projectPatterns: compileAll(
 			`(?i)\b(working on|building|developing|creating)\s+(a\s+)?`,

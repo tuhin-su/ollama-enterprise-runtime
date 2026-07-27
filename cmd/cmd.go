@@ -37,6 +37,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/term"
 
+	"github.com/ollama/ollama/agent"
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/cmd/config"
 	"github.com/ollama/ollama/cmd/launch"
@@ -743,9 +744,10 @@ func exportMemory(ctx context.Context, destPath, format string) error {
 	return nil
 }
 
-// MemoryHandler handles the 'memory' command for exporting and wiping memory database.
+// MemoryHandler handles the 'memory' command for exporting, importing, and wiping memory database.
 func MemoryHandler(cmd *cobra.Command, args []string) error {
 	exportPath, _ := cmd.Flags().GetString("export")
+	importPath, _ := cmd.Flags().GetString("import")
 	wipe, _ := cmd.Flags().GetBool("wipe")
 
 	if wipe {
@@ -766,6 +768,85 @@ func MemoryHandler(cmd *cobra.Command, args []string) error {
 	if exportPath != "" {
 		format, _ := cmd.Flags().GetString("format")
 		return exportMemory(cmd.Context(), exportPath, format)
+	}
+
+	if importPath != "" {
+		return importMemory(cmd.Context(), importPath)
+	}
+
+	return cmd.Help()
+}
+
+// ModelHandler handles the 'model' command for importing/exporting models.
+func ModelHandler(cmd *cobra.Command, args []string) error {
+	importPath, _ := cmd.Flags().GetString("import")
+	exportModel, _ := cmd.Flags().GetString("export")
+
+	if importPath != "" && exportModel != "" {
+		return fmt.Errorf("cannot specify both --import and --export")
+	}
+
+	if importPath != "" {
+		if err := checkServerHeartbeat(cmd, []string{importPath}); err != nil {
+			return err
+		}
+		return ImportHandler(cmd, []string{importPath})
+	}
+
+	if exportModel != "" {
+		dest, _ := cmd.Flags().GetString("dest")
+		if dest == "" {
+			return fmt.Errorf("--dest is required when exporting a model")
+		}
+		if err := checkServerHeartbeat(cmd, []string{exportModel, dest}); err != nil {
+			return err
+		}
+		return ExportHandler(cmd, []string{exportModel, dest})
+	}
+
+	return cmd.Help()
+}
+
+// SkillHandler handles the 'skill' command for importing/exporting skills.
+func SkillHandler(cmd *cobra.Command, args []string) error {
+	importSource, _ := cmd.Flags().GetString("import")
+	exportDest, _ := cmd.Flags().GetString("export")
+
+	if importSource != "" && exportDest != "" {
+		return fmt.Errorf("cannot specify both --import and --export")
+	}
+
+	if importSource != "" {
+		results, err := agent.ImportSkillsFromSource(importSource)
+		if err != nil {
+			return err
+		}
+		if len(results) == 0 {
+			fmt.Println("No skills found or imported.")
+			return nil
+		}
+		for _, res := range results {
+			fmt.Printf("Source %s (%s):\n", res.Source, res.SourceDir)
+			fmt.Printf("  - %d skills imported\n", len(res.Imported))
+			fmt.Printf("  - %d skills already existed\n", len(res.Existing))
+			if len(res.Failures) > 0 {
+				fmt.Printf("  - %d skills failed to import\n", len(res.Failures))
+			}
+		}
+		return nil
+	}
+
+	if exportDest != "" {
+		skillName, _ := cmd.Flags().GetString("name")
+		if err := agent.ExportSkills(skillName, exportDest); err != nil {
+			return err
+		}
+		if skillName != "" {
+			fmt.Printf("Skill %q successfully exported to %s\n", skillName, exportDest)
+		} else {
+			fmt.Printf("All skills successfully exported to %s\n", exportDest)
+		}
+		return nil
 	}
 
 	return cmd.Help()
@@ -2723,73 +2804,45 @@ func NewCLI() *cobra.Command {
 	createCmd.Flags().String("draft-quantize", "", "Quantize draft model to this level")
 	createCmd.Flags().Bool("experimental", false, "Enable experimental safetensors model creation")
 
-	importCmd := &cobra.Command{
-		Use:   "import GGUF_FILE",
-		Short: "Import a GGUF model file or memory database",
-		Long: `Import a GGUF model file directly into Ollama, or import a memory database.
-
-The model name is automatically derived from the filename, or can be
-specified with --name. For vision models, use --mmproj to include the
-multimodal projector file.
-
-To import memory:
-  ollama import --memory path/to/memory.json
-
-Examples:
-  ollama import model.gguf
-  ollama import model.gguf --name mymodel
-  ollama import model.gguf --mmproj vision-projector.gguf
-  ollama import model.gguf --quantize q4_K_M`,
-		Args: func(cmd *cobra.Command, args []string) error {
-			if memory, _ := cmd.Flags().GetString("memory"); memory != "" {
-				return cobra.NoArgs(cmd, args)
-			}
-			return cobra.ExactArgs(1)(cmd, args)
-		},
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if memory, _ := cmd.Flags().GetString("memory"); memory != "" {
-				return nil
-			}
-			return checkServerHeartbeat(cmd, args)
-		},
-		RunE:    ImportHandler,
-	}
-
-	importCmd.Flags().StringP("name", "n", "", "Model name (default: derived from filename)")
-	importCmd.Flags().String("mmproj", "", "Path to multimodal projector GGUF file for vision models")
-	importCmd.Flags().StringP("quantize", "q", "", "Quantize model to this level (e.g. q4_K_M)")
-	importCmd.Flags().String("memory", "", "Import memory database from this JSON file path")
-
-	exportCmd := &cobra.Command{
-		Use:   "export MODEL DESTINATION",
-		Short: "Export a model back to a GGUF file",
-		Long: `Export a model's GGUF file(s) from Ollama's local storage to a specified destination.
-
-If the model is a Vision-Language (VL) model, the multimodal projector (mmproj) file
-will also be exported.
-
-Examples:
-  ollama export mymodel model.gguf
-  ollama export mymodel /path/to/directory/
-  ollama export mymodel model.gguf --mmproj vision-projector.gguf`,
-		Args:    cobra.ExactArgs(2),
-		PreRunE: checkServerHeartbeat,
-		RunE:    ExportHandler,
-	}
-
-	exportCmd.Flags().String("mmproj", "", "Custom destination path for the multimodal projector file (optional)")
-
 	memoryCmd := &cobra.Command{
 		Use:   "memory",
 		Short: "Manage the Ollama memory database",
-		Long:  `Export or wipe the Ollama local memory database.`,
+		Long:  `Export, import, or wipe the Ollama local memory database.`,
 		Args:  cobra.NoArgs,
 		RunE:  MemoryHandler,
 	}
 
 	memoryCmd.Flags().String("export", "", "Export memory database to this path")
+	memoryCmd.Flags().String("import", "", "Import memory database from this JSON file path")
 	memoryCmd.Flags().String("format", "default", "Format for memory export (json or default)")
 	memoryCmd.Flags().Bool("wipe", false, "Wipe (delete) all stored memory data")
+
+	modelCmd := &cobra.Command{
+		Use:   "model",
+		Short: "Manage Ollama models (import or export)",
+		Long:  `Import a model from a GGUF file or export an existing model back to a GGUF file.`,
+		Args:  cobra.NoArgs,
+		RunE:  ModelHandler,
+	}
+
+	modelCmd.Flags().String("import", "", "Import model from this GGUF file path")
+	modelCmd.Flags().String("export", "", "Export model name to a GGUF destination (specified with --dest)")
+	modelCmd.Flags().String("dest", "", "Destination file or directory path (used with --export)")
+	modelCmd.Flags().StringP("name", "n", "", "Model name (default: derived from filename)")
+	modelCmd.Flags().String("mmproj", "", "Path to multimodal projector GGUF file for vision models / custom destination path")
+	modelCmd.Flags().StringP("quantize", "q", "", "Quantize model to this level (e.g. q4_K_M)")
+
+	skillCmd := &cobra.Command{
+		Use:   "skill",
+		Short: "Manage Ollama agent skills (import or export)",
+		Long:  `Import agent skills from coding assistants (claude, codex, pi, or custom paths) or export them to a directory.`,
+		Args:  cobra.NoArgs,
+		RunE:  SkillHandler,
+	}
+
+	skillCmd.Flags().String("import", "", "Import skills from a source ('claude', 'codex', 'pi', 'all', or a custom directory path)")
+	skillCmd.Flags().String("export", "", "Export skills to this destination directory path")
+	skillCmd.Flags().String("name", "", "Name of the specific skill to export (optional, exports all if not specified)")
 
 
 
@@ -2961,8 +3014,6 @@ Examples:
 
 	for _, cmd := range []*cobra.Command{
 		createCmd,
-		importCmd,
-		exportCmd,
 		showCmd,
 		runCmd,
 		stopCmd,
@@ -2974,6 +3025,8 @@ Examples:
 		deleteCmd,
 		serveCmd,
 		memoryCmd,
+		modelCmd,
+		skillCmd,
 	} {
 		switch cmd {
 		case runCmd:
@@ -3011,8 +3064,6 @@ Examples:
 	rootCmd.AddCommand(
 		serveCmd,
 		createCmd,
-		importCmd,
-		exportCmd,
 		showCmd,
 		runCmd,
 		stopCmd,
@@ -3029,6 +3080,8 @@ Examples:
 		runnerCmd,
 		gpuDiscoverCmd,
 		memoryCmd,
+		modelCmd,
+		skillCmd,
 		launch.LaunchCmd(checkServerHeartbeat, runInteractiveTUI),
 	)
 
