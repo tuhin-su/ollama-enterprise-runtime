@@ -16,6 +16,7 @@ Requirements:
 """
 
 import argparse
+import base64
 import json
 import os
 import sys
@@ -46,9 +47,15 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DEFAULT_HOST  = "http://localhost:11434"
-DEFAULT_MODEL = "qwen3:latest"
+DEFAULT_MODEL = "qwen2.5-vl-7b:latest"
 CHAT_ENDPOINT = "/api/chat"
 MEMORY_NOTE   = "(Memory context injected automatically by the server)"
+
+
+def encode_image(image_path: str) -> str:
+    """Encode image to base64."""
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
 
 
 # ── Ollama client ─────────────────────────────────────────────────────────────
@@ -208,14 +215,16 @@ def print_history(messages: list[dict]):
         t.add_column("Content", style="white", no_wrap=False)
         for m in messages:
             role    = m["role"]
-            content = m["content"][:120] + "…" if len(m["content"]) > 120 else m["content"]
+            img_suffix = f" [contains {len(m['images'])} image(s)]" if "images" in m else ""
+            content = (m["content"][:120] + "…" if len(m["content"]) > 120 else m["content"]) + img_suffix
             color   = "green" if role == "user" else "blue"
             t.add_row(f"[{color}]{role}[/{color}]", content)
         console.print(t)
     else:
         print("\n─── Conversation History ───")
         for m in messages:
-            print(f"  [{m['role']}] {m['content'][:80]}")
+            img_suffix = f" [contains {len(m['images'])} image(s)]" if "images" in m else ""
+            print(f"  [{m['role']}] {m['content'][:80]}{img_suffix}")
         print()
 
 
@@ -227,6 +236,7 @@ def print_help():
         "/models":  "List available models",
         "/model":   "Switch model: /model llama3.2",
         "/system":  "Set system prompt: /system You are a pirate",
+        "/image":   "Add image to next message: /image path/to/image.jpg",
         "/exit":    "Exit the demo",
     }
     if HAS_RICH:
@@ -279,6 +289,7 @@ def chat_loop(args: argparse.Namespace):
     client  = OllamaClient(args.host, args.token)
     model   = args.model
     history: list[dict] = []
+    pending_images: list[str] = []
     system  = args.system
 
     print_banner()
@@ -383,13 +394,37 @@ def chat_loop(args: argparse.Namespace):
                     system = None
                     print("  System prompt cleared.")
 
+            elif cmd == "/image":
+                image_path = arg.strip()
+                if image_path:
+                    if (image_path.startswith('"') and image_path.endswith('"')) or (image_path.startswith("'") and image_path.endswith("'")):
+                        image_path = image_path[1:-1]
+                    if os.path.exists(image_path):
+                        try:
+                            encoded = encode_image(image_path)
+                            pending_images.append(encoded)
+                            if HAS_RICH:
+                                console.print(f"[green]✓ Image loaded successfully:[/green] {image_path}")
+                            else:
+                                print(f"✓ Image loaded successfully: {image_path}")
+                        except Exception as e:
+                            print(f"  Error loading image: {e}")
+                    else:
+                        print(f"  File not found: {image_path}")
+                else:
+                    print("  Usage: /image <path/to/image>")
+
             else:
                 print(f"  Unknown command: {cmd}. Type /help for commands.")
 
             continue
 
         # ── Normal chat ───────────────────────────────────────────────────────
-        history.append({"role": "user", "content": user_input})
+        user_message = {"role": "user", "content": user_input}
+        if pending_images:
+            user_message["images"] = pending_images
+            pending_images = []
+        history.append(user_message)
 
         start_time  = time.time()
         full_reply  = ""

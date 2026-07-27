@@ -117,6 +117,37 @@ func TestExplicitSkillActivationBypassesApproval(t *testing.T) {
 	}
 }
 
+func TestSaveSkillTool(t *testing.T) {
+	catalog := testSkillCatalog(t)
+	tool := &SaveSkill{Catalog: catalog}
+	if !agent.ToolRequiresApproval(tool, map[string]any{"name": "new-skill"}) {
+		t.Fatal("save_skill should require approval")
+	}
+
+	result, err := tool.Execute(context.Background(), agent.ToolContext{}, map[string]any{
+		"name":         "new-skill",
+		"description":  "A newly created skill by model.",
+		"instructions": "Do something awesome.",
+	})
+	if err != nil {
+		t.Fatalf("execute save_skill failed: %v", err)
+	}
+
+	if !strings.Contains(result.Content, `Successfully saved skill "new-skill".`) {
+		t.Fatalf("unexpected save_skill response content: %q", result.Content)
+	}
+
+	// Verify it was loaded into the catalog
+	s, err := catalog.Load("new-skill")
+	if err != nil {
+		t.Fatalf("could not load newly saved skill: %v", err)
+	}
+
+	if s.Description != "A newly created skill by model." || !strings.Contains(s.Content(), "Do something awesome.") {
+		t.Fatalf("invalid skill saved content: %#v", s)
+	}
+}
+
 func testSkillCatalog(t *testing.T) *agent.SkillCatalog {
 	t.Helper()
 	dir := t.TempDir()

@@ -715,6 +715,63 @@ func (c *SkillCatalog) Load(name string) (Skill, error) {
 	return skill, nil
 }
 
+func (c *SkillCatalog) Save(name, description, instructions string) (Skill, error) {
+	name = strings.TrimSpace(name)
+	if !skillName.MatchString(name) {
+		return Skill{}, fmt.Errorf("invalid skill name %q", name)
+	}
+	description = strings.TrimSpace(description)
+	if description == "" {
+		return Skill{}, errors.New("description is required")
+	}
+	instructions = strings.TrimSpace(instructions)
+	if instructions == "" {
+		return Skill{}, errors.New("instructions are required")
+	}
+	if c == nil {
+		return Skill{}, errors.New("skills are unavailable")
+	}
+
+	dir := c.dir
+	if dir == "" {
+		var err error
+		dir, err = SkillsDir()
+		if err != nil {
+			return Skill{}, fmt.Errorf("resolve skills directory: %w", err)
+		}
+	}
+
+	skillDir := filepath.Join(dir, name)
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		return Skill{}, fmt.Errorf("create skill directory: %w", err)
+	}
+
+	var b strings.Builder
+	b.WriteString("---\n")
+	fmt.Fprintf(&b, "name: %s\n", name)
+	fmt.Fprintf(&b, "description: %s\n", description)
+	b.WriteString("---\n\n")
+	b.WriteString(instructions)
+	b.WriteString("\n")
+
+	skillPath := filepath.Join(skillDir, skillFilename)
+	if err := os.WriteFile(skillPath, []byte(b.String()), 0o644); err != nil {
+		return Skill{}, fmt.Errorf("write skill file: %w", err)
+	}
+
+	skill, err := parseSkill(skillPath, name)
+	if err != nil {
+		return Skill{}, err
+	}
+
+	if c.skills == nil {
+		c.skills = make(map[string]Skill)
+	}
+	c.skills[name] = skill
+	return skill, nil
+}
+
+
 // SystemContext advertises the catalog without expanding full instructions in
 // every request. The skill call is the explicit loading boundary.
 func (c *SkillCatalog) SystemContext() string {

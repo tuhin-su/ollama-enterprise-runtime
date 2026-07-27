@@ -259,6 +259,8 @@ func agentDefaultSystemPromptWithWorkingDir(now time.Time, modelName string, wor
 		"Use "+shellName+" carefully. Prefer read-only inspection first. Stay within the current working directory unless explicitly asked. Surface intent before risky actions such as writes, deletes, moves, installs, git state changes, service changes, sudo, secrets access, network scripts, or commands outside the working directory. Request approval when required and do not work around denied approvals.",
 		"",
 		"Tell the user about meaningful changes, verification, failures, blockers, assumptions, and risks. Summarize routine tool output instead of dumping it.",
+		"",
+		"Long-Term Memory: A native long-term memory system is active. It automatically extracts user facts, preferences, project contexts, and episodic events/completed actions from the conversation. To help the memory system capture details, state clearly when a task is completed, when a preference is established, or what project/codebase context is being worked on (e.g., use phrases like 'I have completed...', 'I have finished...', 'fixed the bug...', 'resolved the issue...', 'working on developing...', or 'building...'). Captured memories are automatically retrieved and injected into your context/system prompt in future runs.",
 	)
 	if workingDir != "" {
 		parts = append(parts, "Current working directory: "+strconv.Quote(workingDir)+".")
@@ -293,8 +295,9 @@ func agentToolsRegistry(ctx context.Context, client *api.Client, modelName strin
 	}
 	registry.Register(&agenttools.Read{})
 	registry.Register(&agenttools.Edit{})
-	if len(skillCatalog.List()) > 0 {
+	if skillCatalog != nil {
 		registry.Register(&agenttools.Skill{Catalog: skillCatalog})
+		registry.Register(&agenttools.SaveSkill{Catalog: skillCatalog})
 	}
 
 	if os.Getenv("OLLAMA_AGENT_DISABLE_WEBSEARCH") == "" {
