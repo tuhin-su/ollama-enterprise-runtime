@@ -74,6 +74,12 @@ func prepareAgentModel(cmd *cobra.Command, client *api.Client, opts *agentTUIOpt
 	}
 	opts.MultiModal = showResponseSupportsMultimodal(info)
 	opts.ContextWindowTokens = showResponseContextWindow(info)
+	if opts.Options == nil {
+		opts.Options = make(map[string]any)
+	}
+	if _, ok := opts.Options["num_ctx"]; !ok && opts.ContextWindowTokens > 0 {
+		opts.Options["num_ctx"] = opts.ContextWindowTokens
+	}
 	return info, nil
 }
 
@@ -260,7 +266,7 @@ func agentDefaultSystemPromptWithWorkingDir(now time.Time, modelName string, wor
 		"",
 		"Tell the user about meaningful changes, verification, failures, blockers, assumptions, and risks. Summarize routine tool output instead of dumping it.",
 		"",
-		"Long-Term Memory: A native long-term memory system is active. It automatically extracts user facts, preferences, project contexts, and episodic events/completed actions from the conversation. To help the memory system capture details, state clearly when a task is completed, when a preference is established, or what project/codebase context is being worked on (e.g., use phrases like 'I have completed...', 'I have finished...', 'fixed the bug...', 'resolved the issue...', 'working on developing...', or 'building...'). Captured memories are automatically retrieved and injected into your context/system prompt in future runs.",
+		"Long-Term Memory: A native long-term memory system is active. You have direct access to query, save, and manage memories using the tools: `save_memory`, `list_memories`, `delete_memory`, `save_special_memory`, `list_special_memories`, and `delete_special_memory`. Use them to explicitly remember important user/project facts or search past context when asked.",
 	)
 	if workingDir != "" {
 		parts = append(parts, "Current working directory: "+strconv.Quote(workingDir)+".")

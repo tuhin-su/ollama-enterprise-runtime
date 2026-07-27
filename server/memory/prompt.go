@@ -14,6 +14,49 @@ func NewPromptBuilder() *DefaultPromptBuilder {
 	return &DefaultPromptBuilder{}
 }
 
+// MemoryBuilder (meory_builder) formats the raw memories into a structured array of strings.
+type MemoryBuilder struct{}
+
+func (mb *MemoryBuilder) Build(memories []*SearchResult, maxTokens int) ([]string, int) {
+	var lines []string
+	tokensUsed := 0
+	for _, sr := range memories {
+		line := formatMemoryLine(sr.Memory, sr.Score)
+		lineTokens := estimateTokens(line)
+		if tokensUsed+lineTokens > maxTokens {
+			break
+		}
+		lines = append(lines, line)
+		tokensUsed += lineTokens
+	}
+	return lines, tokensUsed
+}
+
+// ContextBuilder formats the memory list into the XML context block.
+type ContextBuilder struct{}
+
+func (cb *ContextBuilder) Build(lines []string) string {
+	if len(lines) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("\n\n<memory_context>\n")
+	for _, line := range lines {
+		sb.WriteString(line)
+		sb.WriteByte('\n')
+	}
+	sb.WriteString("</memory_context>\n\n")
+	sb.WriteString("Use the above memories to personalize your responses. ")
+	sb.WriteString("Reference relevant memories naturally without explicitly mentioning ")
+	sb.WriteString("that you have a memory system unless the user asks about it.")
+	return sb.String()
+}
+
+// ModelFinalPrompt combines the original system prompt with the memory context block.
+func ModelFinalPrompt(systemPrompt string, contextBlock string) string {
+	return systemPrompt + contextBlock
+}
+
 // Build injects ranked memories into the system prompt. It stays within
 // maxTokens by estimating token counts and truncating when necessary.
 func (b *DefaultPromptBuilder) Build(memories []*SearchResult, systemPrompt string, maxTokens int) string {
@@ -21,39 +64,14 @@ func (b *DefaultPromptBuilder) Build(memories []*SearchResult, systemPrompt stri
 		return systemPrompt
 	}
 
-	var sb strings.Builder
-	sb.WriteString(systemPrompt)
-	sb.WriteString("\n\n<memory_context>\n")
+	// Pipeline: [input] -> [memory(knnSearch)] -> [meory_builder] -> [contextBuilder] -> [ModelFinalPromt]
+	mb := &MemoryBuilder{}
+	lines, _ := mb.Build(memories, maxTokens)
 
-	tokensUsed := 0
-	memCount := 0
+	cb := &ContextBuilder{}
+	contextBlock := cb.Build(lines)
 
-	for _, sr := range memories {
-		mem := sr.Memory
-		line := formatMemoryLine(mem, sr.Score)
-		lineTokens := estimateTokens(line)
-
-		if tokensUsed+lineTokens > maxTokens {
-			break
-		}
-
-		sb.WriteString(line)
-		sb.WriteByte('\n')
-		tokensUsed += lineTokens
-		memCount++
-	}
-
-	if memCount == 0 {
-		// No memories fit within budget — return original prompt
-		return systemPrompt
-	}
-
-	sb.WriteString("</memory_context>\n\n")
-	sb.WriteString("Use the above memories to personalize your responses. ")
-	sb.WriteString("Reference relevant memories naturally without explicitly mentioning ")
-	sb.WriteString("that you have a memory system unless the user asks about it.")
-
-	return sb.String()
+	return ModelFinalPrompt(systemPrompt, contextBlock)
 }
 
 // formatMemoryLine renders a single memory for prompt injection.

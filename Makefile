@@ -55,7 +55,7 @@ build: lancedb-bindings
 	fi
 	@echo ">>> Compiling payloads and binary..."
 	cmake --build build --parallel $(PARALLEL_JOBS)
-	@cp build/ollama .
+	@if [ -f build/ollama ]; then cp build/ollama .; fi
 	@echo ">>> Build completed successfully! You can run ./ollama serve or run 'make install'."
 
 install:
