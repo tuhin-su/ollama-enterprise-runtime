@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/image/webp"
@@ -1852,12 +1853,22 @@ func tokenAuthMiddleware() gin.HandlerFunc {
 
 		auth := c.GetHeader("Authorization")
 		const prefix = "Bearer "
-		if !strings.HasPrefix(auth, prefix) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid Authorization header, expected 'Bearer <token>'"})
+		var tokenFromHeader string
+
+		if strings.HasPrefix(auth, prefix) {
+			tokenFromHeader = strings.TrimPrefix(auth, prefix)
+		} else {
+			tokenFromHeader = c.GetHeader("x-api-key")
+		}
+
+		if tokenFromHeader == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing Authorization header or x-api-key header"})
 			return
 		}
 
-		if strings.TrimPrefix(auth, prefix) != token {
+		slog.Info("tokenAuthMiddleware auth check", "auth_header", auth, "x-api-key", c.GetHeader("x-api-key"), "expected_token", token)
+
+		if tokenFromHeader != token {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid API token"})
 			return
 		}
@@ -1948,6 +1959,7 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 	r.GET("/v1/models", middleware.ListMiddleware(), s.ListHandler)
 	r.GET("/v1/models/:model", cloudModelPathPassthroughMiddleware(cloudErrRemoteModelDetailsUnavailable), middleware.RetrieveMiddleware(), s.ShowHandler)
 	r.POST("/v1/responses", s.withInferenceRequestLogging("/v1/responses", cloudPassthroughMiddleware(cloudErrRemoteInferenceUnavailable), middleware.ResponsesMiddleware(), s.ChatHandler)...)
+	r.POST("/v1/messages", s.withInferenceRequestLogging("/v1/messages", s.AnthropicMessagesHandler)...)
 	// OpenAI-compatible image generation endpoints
 	r.POST("/v1/images/generations", cloudPassthroughMiddleware(cloudErrRemoteInferenceUnavailable), middleware.ImageGenerationsMiddleware(), s.GenerateHandler)
 	r.POST("/v1/images/edits", cloudPassthroughMiddleware(cloudErrRemoteInferenceUnavailable), middleware.ImageEditsMiddleware(), s.GenerateHandler)
@@ -1955,7 +1967,7 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 	r.POST("/v1/audio/transcriptions", middleware.TranscriptionMiddleware(), s.ChatHandler)
 
 	// Inference (Anthropic compatibility)
-	r.POST("/v1/messages", s.withInferenceRequestLogging("/v1/messages", cloudPassthroughMiddleware(cloudErrRemoteInferenceUnavailable), middleware.AnthropicMessagesMiddleware(), s.ChatHandler)...)
+	// Overridden above with s.AnthropicMessagesHandler
 
 	return r, nil
 }
@@ -3406,5 +3418,228 @@ func (s *Server) handleImageGenerate(c *gin.Context, req api.GenerateRequest, mo
 
 	if !isStreaming {
 		c.JSON(http.StatusOK, finalResponse)
+	}
+}
+
+// AnthropicMessagesHandler proxy-translates Anthropic /v1/messages requests to Ollama
+func (s *Server) AnthropicMessagesHandler(c *gin.Context) {
+	var req struct {
+		Model        string          `json:"model"`
+		Messages     []struct {
+			Role    string          `json:"role"`
+			Content json.RawMessage `json:"content"`
+		} `json:"messages"`
+		System       json.RawMessage `json:"system,omitempty"`
+		MaxTokens    int             `json:"max_tokens,omitempty"`
+		Stream       bool            `json:"stream,omitempty"`
+		OutputFormat *struct {
+			Type   string `json:"type"`
+			Schema any    `json:"schema"`
+		} `json:"output_format,omitempty"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Translate model name to the local model qwen2.5-vl-7b:latest
+	modelName := req.Model
+	if strings.Contains(strings.ToLower(modelName), "claude") || modelName == "" {
+		modelName = "qwen2.5-vl-7b:latest"
+	}
+
+	modelRef, err := parseAndValidateModelRef(modelName)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	caps := []model.Capability{model.CapabilityCompletion}
+	r, m, opts, err := s.scheduleRunner(c.Request.Context(), modelRef.Name.String(), caps, nil, nil, nil)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var systemStr string
+	if len(req.System) > 0 {
+		systemBytes := []byte(req.System)
+		if systemBytes[0] == '[' {
+			var blocks []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			}
+			if err := json.Unmarshal(systemBytes, &blocks); err == nil {
+				for _, block := range blocks {
+					if block.Type == "text" {
+						systemStr += block.Text
+					}
+				}
+			}
+		} else if systemBytes[0] == '"' {
+			_ = json.Unmarshal(systemBytes, &systemStr)
+		} else {
+			systemStr = string(systemBytes)
+		}
+	}
+
+	var ollamaMsgs []api.Message
+	if systemStr != "" {
+		ollamaMsgs = append(ollamaMsgs, api.Message{
+			Role:    "system",
+			Content: systemStr,
+		})
+	}
+	for _, msg := range req.Messages {
+		var contentStr string
+		contentBytes := []byte(msg.Content)
+		if len(contentBytes) > 0 && contentBytes[0] == '[' {
+			var blocks []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			}
+			if err := json.Unmarshal(contentBytes, &blocks); err == nil {
+				for _, block := range blocks {
+					if block.Type == "text" {
+						contentStr += block.Text
+					}
+				}
+			}
+		} else if len(contentBytes) > 0 && contentBytes[0] == '"' {
+			_ = json.Unmarshal(contentBytes, &contentStr)
+		} else {
+			contentStr = string(contentBytes)
+		}
+
+		ollamaMsgs = append(ollamaMsgs, api.Message{
+			Role:    msg.Role,
+			Content: contentStr,
+		})
+	}
+
+	var schemaFormat json.RawMessage
+	if req.OutputFormat != nil && req.OutputFormat.Type == "json_schema" {
+		sfBytes, _ := json.Marshal(req.OutputFormat.Schema)
+		schemaFormat = json.RawMessage(sfBytes)
+	}
+
+	nativeReq, err := prepareNativeChatRequest(c.Request.Context(), m, r, opts, llm.ChatRequest{
+		Messages: ollamaMsgs,
+		Format:   schemaFormat,
+		Options:  opts,
+		Shift:    true,
+	}, true)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	msgID := fmt.Sprintf("msg_%s", uuid.New().String())
+
+	if req.Stream {
+		c.Header("Content-Type", "text/event-stream")
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
+		c.Header("Transfer-Encoding", "chunked")
+
+		ch := make(chan string, 100)
+		go func() {
+			defer close(ch)
+
+			mStartBytes, _ := json.Marshal(map[string]any{
+				"type": "message_start",
+				"message": map[string]any{
+					"id":      msgID,
+					"type":    "message",
+					"role":    "assistant",
+					"model":   modelName,
+					"content": []any{},
+					"usage": map[string]any{
+						"input_tokens":  10,
+						"output_tokens": 0,
+					},
+				},
+			})
+			ch <- fmt.Sprintf("event: message_start\ndata: %s\n\n", string(mStartBytes))
+
+			cStartBytes, _ := json.Marshal(map[string]any{
+				"type":          "content_block_start",
+				"index":         0,
+				"content_block": map[string]any{"type": "text", "text": ""},
+			})
+			ch <- fmt.Sprintf("event: content_block_start\ndata: %s\n\n", string(cStartBytes))
+
+			_ = r.Chat(c.Request.Context(), nativeReq, func(resp llm.ChatResponse) {
+				if resp.Message.Content != "" {
+					deltaBytes, _ := json.Marshal(map[string]any{
+						"type":  "content_block_delta",
+						"index": 0,
+						"delta": map[string]any{
+							"type": "text_delta",
+							"text": resp.Message.Content,
+						},
+					})
+					ch <- fmt.Sprintf("event: content_block_delta\ndata: %s\n\n", string(deltaBytes))
+				}
+			})
+
+			cStopBytes, _ := json.Marshal(map[string]any{
+				"type":  "content_block_stop",
+				"index": 0,
+			})
+			ch <- fmt.Sprintf("event: content_block_stop\ndata: %s\n\n", string(cStopBytes))
+
+			mDeltaBytes, _ := json.Marshal(map[string]any{
+				"type":  "message_delta",
+				"delta": map[string]any{"stop_reason": "end_turn"},
+				"usage": map[string]any{"output_tokens": 20},
+			})
+			ch <- fmt.Sprintf("event: message_delta\ndata: %s\n\n", string(mDeltaBytes))
+
+			ch <- "event: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+		}()
+
+		c.Stream(func(w io.Writer) bool {
+			msg, ok := <-ch
+			if !ok {
+				return false
+			}
+			_, err := w.Write([]byte(msg))
+			if err != nil {
+				return false
+			}
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+			return true
+		})
+	} else {
+		var assistantText string
+		err = r.Chat(c.Request.Context(), nativeReq, func(resp llm.ChatResponse) {
+			assistantText += resp.Message.Content
+		})
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, map[string]any{
+			"id":    msgID,
+			"type":  "message",
+			"role":  "assistant",
+			"model": modelName,
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": assistantText,
+				},
+			},
+			"stop_reason": "end_turn",
+			"usage": map[string]any{
+				"input_tokens":  10,
+				"output_tokens": 20,
+			},
+		})
 	}
 }
