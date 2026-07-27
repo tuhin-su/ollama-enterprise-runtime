@@ -1,254 +1,80 @@
-#!/usr/bin/env bash
-# install.sh — Universal installer for tuhin-su/ollama-master
-# Supports: Linux (amd64, arm64, arm), macOS (amd64, arm64)
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/tuhin-su/ollama-master/main/install.sh | sh
-#   VERSION=v1.2.3 sh install.sh          # pin a specific version
-#   INSTALL_DIR=/usr/local/bin sh install.sh
+#!/bin/bash
 
-set -euo pipefail
+# Exit immediately if a command exits with a non-zero status
+set -e
 
-# ─────────────────────────────────────────────
-# Config
-# ─────────────────────────────────────────────
-REPO="tuhin-su/ollama-master"
-BINARY="ollama"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-# ─────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────
-info()    { printf '\033[0;32m[info]\033[0m  %s\n' "$*"; }
-warn()    { printf '\033[0;33m[warn]\033[0m  %s\n' "$*" >&2; }
-error()   { printf '\033[0;31m[error]\033[0m %s\n' "$*" >&2; exit 1; }
-success() { printf '\033[0;34m[done]\033[0m  %s\n' "$*"; }
+echo -e "${BLUE}=== Ollama Build & Install Script ===${NC}"
 
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || error "Required command not found: $1. Please install it and retry."
-}
+# Detect go environment
+if ! command -v go &> /dev/null; then
+    echo -e "${RED}Error: Go compiler is not installed or not in PATH.${NC}"
+    exit 1
+fi
 
-# ─────────────────────────────────────────────
-# Detect OS
-# ─────────────────────────────────────────────
-detect_os() {
-  local os
-  os="$(uname -s)"
-  case "$os" in
-    Linux)  echo "linux" ;;
-    Darwin) echo "darwin" ;;
-    *)      error "Unsupported OS: $os. For Windows use install.ps1" ;;
-  esac
-}
+# Detect platform operating system
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
 
-# ─────────────────────────────────────────────
-# Detect CPU architecture
-# ─────────────────────────────────────────────
-detect_arch() {
-  local arch
-  arch="$(uname -m)"
-  case "$arch" in
-    x86_64 | amd64)          echo "amd64" ;;
-    aarch64 | arm64)         echo "arm64" ;;
-    armv7l | armv7 | armhf)  echo "arm"   ;;
-    armv6l)                  echo "arm"   ;;
-    *)                       error "Unsupported architecture: $arch" ;;
-  esac
-}
+if [[ "$OS" != "linux" ]]; then
+    echo -e "${YELLOW}Warning: Only Linux platform is officially tested with the static library linker paths in this script.${NC}"
+fi
 
-# ─────────────────────────────────────────────
-# Resolve latest version tag from GitHub API
-# ─────────────────────────────────────────────
-latest_version() {
-  local api_url="https://api.github.com/repos/${REPO}/releases/latest"
-  local version
-
-  if command -v curl >/dev/null 2>&1; then
-    version="$(curl -fsSL "$api_url" | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
-  elif command -v wget >/dev/null 2>&1; then
-    version="$(wget -qO- "$api_url" | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
-  else
-    error "Neither curl nor wget found. Please install one and retry."
-  fi
-
-  [ -n "$version" ] || error "Could not determine latest release version. Check your internet connection."
-  echo "$version"
-}
-
-# ─────────────────────────────────────────────
-# Download a file (curl or wget)
-# ─────────────────────────────────────────────
-download() {
-  local url="$1"
-  local dest="$2"
-  info "Downloading: $url"
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL --progress-bar "$url" -o "$dest"
-  else
-    wget -q --show-progress "$url" -O "$dest"
-  fi
-}
-
-# ─────────────────────────────────────────────
-# Verify SHA256 checksum if a .sha256 file exists
-# ─────────────────────────────────────────────
-verify_checksum() {
-  local file="$1"
-  local checksum_url="$2"
-  local checksum_file="${file}.sha256"
-
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$checksum_url" -o "$checksum_file" 2>/dev/null || { warn "No checksum file found, skipping verification."; return 0; }
-  else
-    wget -qO "$checksum_file" "$checksum_url" 2>/dev/null || { warn "No checksum file found, skipping verification."; return 0; }
-  fi
-
-  info "Verifying checksum..."
-  if command -v sha256sum >/dev/null 2>&1; then
-    (cd "$(dirname "$file")" && echo "$(cat "$checksum_file")  $(basename "$file")" | sha256sum -c -) \
-      || error "Checksum verification failed! The download may be corrupt."
-  elif command -v shasum >/dev/null 2>&1; then
-    (cd "$(dirname "$file")" && echo "$(cat "$checksum_file")  $(basename "$file")" | shasum -a 256 -c -) \
-      || error "Checksum verification failed! The download may be corrupt."
-  else
-    warn "sha256sum/shasum not found, skipping checksum verification."
-  fi
-}
-
-# ─────────────────────────────────────────────
-# Install binary
-# ─────────────────────────────────────────────
-install_binary() {
-  local src="$1"
-  local install_path="${INSTALL_DIR}/${BINARY}"
-
-  # Create install dir if needed
-  if [ ! -d "$INSTALL_DIR" ]; then
-    info "Creating $INSTALL_DIR ..."
-    if [ "$(id -u)" -eq 0 ]; then
-      mkdir -p "$INSTALL_DIR"
-    else
-      sudo mkdir -p "$INSTALL_DIR"
+# 1. Download LanceDB CGO native bindings if they don't exist
+if [[ ! -f "include/lancedb.h" || ! -f "lib/linux_amd64/liblancedb_go.a" ]]; then
+    echo -e "${BLUE}Downloading LanceDB CGO native bindings...${NC}"
+    
+    # Locate the download script in go mod cache
+    LANCE_MOD_DIR=$(go list -m -f '{{.Dir}}' github.com/lancedb/lancedb-go 2>/dev/null || true)
+    if [[ -z "$LANCE_MOD_DIR" ]]; then
+        echo -e "${BLUE}Resolving lancedb-go dependency...${NC}"
+        go get github.com/lancedb/lancedb-go@v0.1.2
+        LANCE_MOD_DIR=$(go list -m -f '{{.Dir}}' github.com/lancedb/lancedb-go)
     fi
-  fi
+    
+    DOWNLOAD_SCRIPT="$LANCE_MOD_DIR/scripts/download-artifacts.sh"
+    if [[ -f "$DOWNLOAD_SCRIPT" ]]; then
+        bash "$DOWNLOAD_SCRIPT" v0.1.2
+    else
+        echo -e "${RED}Error: Could not locate lancedb-go download script at: $DOWNLOAD_SCRIPT${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}LanceDB native artifacts already present.${NC}"
+fi
 
-  info "Installing to $install_path ..."
-  chmod +x "$src"
-  if [ -w "$INSTALL_DIR" ]; then
-    cp "$src" "$install_path"
-  else
-    sudo cp "$src" "$install_path"
-  fi
+# 2. Build Ollama binary
+echo -e "${BLUE}Building Ollama with LanceDB storage engine...${NC}"
+ROOT_DIR=$(pwd)
 
-  success "Installed $BINARY $(${install_path} --version 2>/dev/null || true)"
-}
+export CGO_CFLAGS="-I$ROOT_DIR/include"
+export CGO_LDFLAGS="$ROOT_DIR/lib/linux_amd64/liblancedb_go.a -lm -ldl -lpthread"
 
-# ─────────────────────────────────────────────
-# Post-install: systemd service (Linux only)
-# ─────────────────────────────────────────────
-install_systemd_service() {
-  command -v systemctl >/dev/null 2>&1 || return 0
-  [ "$(id -u)" -ne 0 ] && ! command -v sudo >/dev/null 2>&1 && return 0
+go build -o ollama .
 
-  local service_file="/etc/systemd/system/ollama.service"
-  info "Installing systemd service..."
+echo -e "${GREEN}Build successful: Binary compiled at $ROOT_DIR/ollama${NC}"
 
-  cat <<'EOF' | if [ "$(id -u)" -eq 0 ]; then tee "$service_file"; else sudo tee "$service_file"; fi > /dev/null
-[Unit]
-Description=Ollama AI Runtime
-Documentation=https://github.com/tuhin-su/ollama-master
-After=network-online.target
+# 3. Install Ollama binary
+INSTALL_DIR="/usr/local/bin"
 
-[Service]
-ExecStart=/usr/local/bin/ollama serve
-Restart=always
-RestartSec=3
-Environment="HOME=/root"
-Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-  if [ "$(id -u)" -eq 0 ]; then
-    systemctl daemon-reload
-    systemctl enable ollama 2>/dev/null || true
-    info "Service installed. Start with: systemctl start ollama"
-  else
-    sudo systemctl daemon-reload
-    sudo systemctl enable ollama 2>/dev/null || true
-    info "Service installed. Start with: sudo systemctl start ollama"
-  fi
-}
-
-# ─────────────────────────────────────────────
-# Main
-# ─────────────────────────────────────────────
-main() {
-  printf '\n'
-  printf '  ██████╗ ██╗     ██╗      █████╗ ███╗   ███╗ █████╗ \n'
-  printf ' ██╔═══██╗██║     ██║     ██╔══██╗████╗ ████║██╔══██╗\n'
-  printf ' ██║   ██║██║     ██║     ███████║██╔████╔██║███████║\n'
-  printf ' ██║   ██║██║     ██║     ██╔══██║██║╚██╔╝██║██╔══██║\n'
-  printf ' ╚██████╔╝███████╗███████╗██║  ██║██║ ╚═╝ ██║██║  ██║\n'
-  printf '  ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝\n'
-  printf '\n'
-  printf '  github.com/tuhin-su/ollama-master\n\n'
-
-  local os arch version asset_name asset_url checksum_url bin_path
-
-  os="$(detect_os)"
-  arch="$(detect_arch)"
-  version="${VERSION:-$(latest_version)}"
-  version="${version#v}"   # strip leading 'v' for display; add back for URL
-
-  info "OS:           $os"
-  info "Architecture: $arch"
-  info "Version:      v${version}"
-
-  # Asset naming convention: ollama-<os>-<arch>[.tar.gz]
-  # e.g. ollama-linux-amd64.tar.gz, ollama-darwin-arm64
-  local base_url="https://github.com/${REPO}/releases/download/v${version}"
-
-  case "$os" in
-    linux)
-      asset_name="ollama-linux-${arch}.tar.gz"
-      asset_url="${base_url}/${asset_name}"
-      checksum_url="${base_url}/${asset_name}.sha256"
-      ;;
-    darwin)
-      asset_name="ollama-darwin-${arch}.tar.gz"
-      asset_url="${base_url}/${asset_name}"
-      checksum_url="${base_url}/${asset_name}.sha256"
-      ;;
-  esac
-
-  local archive_path="${TMP_DIR}/${asset_name}"
-  download "$asset_url" "$archive_path"
-  verify_checksum "$archive_path" "$checksum_url"
-
-  info "Extracting archive..."
-  tar -xzf "$archive_path" -C "$TMP_DIR"
-
-  # Find the binary — it may be in a subdirectory
-  bin_path="$(find "$TMP_DIR" -type f -name "$BINARY" | head -1)"
-  [ -n "$bin_path" ] || error "Binary '$BINARY' not found in archive."
-
-  install_binary "$bin_path"
-
-  if [ "$os" = "linux" ]; then
-    install_systemd_service
-  fi
-
-  printf '\n'
-  success "Ollama v${version} installed successfully!"
-  printf '\n'
-  printf '  Quick start:\n'
-  printf '    ollama serve          # start the server\n'
-  printf '    ollama run gemma4     # run a model\n'
-  printf '\n'
-  printf '  Docs: https://github.com/tuhin-su/ollama-master#readme\n\n'
-}
-
-main "$@"
+echo -e "${BLUE}Installing ollama binary to $INSTALL_DIR...${NC}"
+if [ -w "$INSTALL_DIR" ]; then
+    cp ollama "$INSTALL_DIR/ollama"
+    echo -e "${GREEN}Success! ollama has been installed to $INSTALL_DIR/ollama${NC}"
+else
+    echo -e "${YELLOW}Notice: Write permission denied to $INSTALL_DIR. Trying with sudo...${NC}"
+    if command -v sudo &> /dev/null; then
+        sudo cp ollama "$INSTALL_DIR/ollama"
+        echo -e "${GREEN}Success! ollama has been installed to $INSTALL_DIR/ollama using sudo.${NC}"
+    else
+        echo -e "${RED}Error: Could not write to $INSTALL_DIR and 'sudo' is not available.${NC}"
+        echo -e "${YELLOW}Please manually copy the 'ollama' binary to your path, e.g.:${NC}"
+        echo -e "  cp ollama ~/.local/bin/ollama"
+    fi
+fi
