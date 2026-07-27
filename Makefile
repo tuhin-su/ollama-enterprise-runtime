@@ -47,8 +47,12 @@ lancedb-bindings:
 build: lancedb-bindings
 	@echo ">>> Configuring superbuild..."
 	cmake -B build -DCMAKE_INSTALL_PREFIX=$(PREFIX) .
-	@echo ">>> Compiling Ollama and payload runner (llama-server)..."
-	cmake --build build --parallel $(PARALLEL_JOBS)
+	@echo ">>> Compiling native payload runner (llama-server)..."
+	cmake --build build --parallel $(PARALLEL_JOBS) --target ollama-llama-server-local
+	@echo ">>> Compiling Ollama Go binary..."
+	export CGO_CFLAGS="-I$$(pwd)/include" && \
+	export CGO_LDFLAGS="$$(pwd)/lib/linux_amd64/liblancedb_go.a -lm" && \
+	go build -o ollama .
 	@echo ">>> Build completed successfully! You can run ./ollama serve or run 'make install'."
 
 install:
