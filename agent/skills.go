@@ -900,6 +900,9 @@ func ExportSkills(skillName, destinationDir string) error {
 			return fmt.Errorf("skill %q is not a directory", skillName)
 		}
 		destPath := filepath.Join(absDest, skillName)
+		if err := os.MkdirAll(destPath, 0755); err != nil {
+			return fmt.Errorf("create destination directory for skill %q: %w", skillName, err)
+		}
 		return copyImportTree(skillPath, destPath)
 	}
 
@@ -914,6 +917,9 @@ func ExportSkills(skillName, destinationDir string) error {
 		if entry.IsDir() {
 			src := filepath.Join(skillsDir, entry.Name())
 			dst := filepath.Join(absDest, entry.Name())
+			if err := os.MkdirAll(dst, 0755); err != nil {
+				return fmt.Errorf("create destination directory for skill %q: %w", entry.Name(), err)
+			}
 			if err := copyImportTree(src, dst); err != nil {
 				return fmt.Errorf("export skill %q failed: %w", entry.Name(), err)
 			}

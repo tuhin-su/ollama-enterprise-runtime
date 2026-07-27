@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -115,7 +116,9 @@ func injectMemoryIntoMessages(ctx context.Context, userID string, req *api.ChatR
 // assistant reply. When the channel closes it fires storeResponseMemories
 // asynchronously so the HTTP response is never delayed.
 func collectAndStoreMemories(ctx context.Context, userID string, req *api.ChatRequest, ch chan any) chan any {
+	slog.Info("collectAndStoreMemories: wrapping channel", "userID", userID, "model", req.Model)
 	if memoryEngine == nil || userID == "" {
+		slog.Warn("collectAndStoreMemories: memory engine or userID missing", "engineNil", memoryEngine == nil, "userID", userID)
 		return ch
 	}
 
@@ -128,12 +131,16 @@ func collectAndStoreMemories(ctx context.Context, userID string, req *api.ChatRe
 		for item := range ch {
 			out <- item // pass through immediately — no latency added
 
+			slog.Info("collectAndStoreMemories: received item", "type", fmt.Sprintf("%T", item))
+
 			if resp, ok := item.(api.ChatResponse); ok {
 				reply.WriteString(resp.Message.Content)
+				slog.Info("collectAndStoreMemories: accumulated content chunk", "chunkLen", len(resp.Message.Content), "done", resp.Done, "accumulatedLen", reply.Len())
 
 				if resp.Done && reply.Len() > 0 {
 					// Store memories after the last chunk is forwarded
 					fullReply := reply.String()
+					slog.Info("collectAndStoreMemories: response done, storing memories", "userID", userID, "replyLen", len(fullReply))
 					go storeResponseMemories(ctx, userID, req, fullReply)
 				}
 			}
@@ -146,7 +153,9 @@ func collectAndStoreMemories(ctx context.Context, userID string, req *api.ChatRe
 // storeResponseMemories asynchronously extracts and stores memories from
 // a completed assistant response. Non-blocking.
 func storeResponseMemories(ctx context.Context, userID string, req *api.ChatRequest, assistantReply string) {
+	slog.Info("storeResponseMemories: starting", "userID", userID, "replyLen", len(assistantReply))
 	if memoryEngine == nil || userID == "" || assistantReply == "" {
+		slog.Warn("storeResponseMemories: preconditions failed", "engineNil", memoryEngine == nil, "userID", userID, "replyEmpty", assistantReply == "")
 		return
 	}
 
@@ -155,6 +164,7 @@ func storeResponseMemories(ctx context.Context, userID string, req *api.ChatRequ
 		Model:    req.Model,
 		Messages: toMemoryMessages(req.Messages),
 	}
+	slog.Info("storeResponseMemories: calling ProcessResponse", "numMessages", len(req.Messages))
 	memoryEngine.ProcessResponse(ctx, memReq, assistantReply)
 }
 
