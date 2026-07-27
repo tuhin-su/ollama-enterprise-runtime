@@ -144,6 +144,7 @@ type MemoryStore interface {
 	DeleteSpecialMemory(ctx context.Context, id string) error
 	// Export/Import helper
 	Export(ctx context.Context) ([]*Memory, []*Conversation, []*SpecialMemory, error)
+	Wipe(ctx context.Context) error
 }
 
 // VectorIndex performs approximate nearest-neighbour search on embeddings.

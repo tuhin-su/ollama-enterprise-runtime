@@ -743,6 +743,34 @@ func exportMemory(ctx context.Context, destPath, format string) error {
 	return nil
 }
 
+// MemoryHandler handles the 'memory' command for exporting and wiping memory database.
+func MemoryHandler(cmd *cobra.Command, args []string) error {
+	exportPath, _ := cmd.Flags().GetString("export")
+	wipe, _ := cmd.Flags().GetBool("wipe")
+
+	if wipe {
+		cfg := memory.LoadConfig()
+		store, err := memory.NewLanceDBStore(cfg.DBPath)
+		if err != nil {
+			return fmt.Errorf("failed to open memory store for wiping: %w", err)
+		}
+		defer store.Close()
+
+		if err := store.Wipe(cmd.Context()); err != nil {
+			return fmt.Errorf("failed to wipe memory store: %w", err)
+		}
+		fmt.Println("Memory database successfully wiped.")
+		return nil
+	}
+
+	if exportPath != "" {
+		format, _ := cmd.Flags().GetString("format")
+		return exportMemory(cmd.Context(), exportPath, format)
+	}
+
+	return cmd.Help()
+}
+
 // ExportHandler handles exporting a model's GGUF file(s) back out of Ollama.
 func ExportHandler(cmd *cobra.Command, args []string) error {
 	memoryPath, _ := cmd.Flags().GetString("memory")
@@ -2772,6 +2800,19 @@ Examples:
 	exportCmd.Flags().String("memory", "", "Export memory database to this path")
 	exportCmd.Flags().String("format", "default", "Format for memory export (json or default)")
 
+	memoryCmd := &cobra.Command{
+		Use:   "memory",
+		Short: "Manage the Ollama memory database",
+		Long:  `Export or wipe the Ollama local memory database.`,
+		Args:  cobra.NoArgs,
+		RunE:  MemoryHandler,
+	}
+
+	memoryCmd.Flags().String("export", "", "Export memory database to this path")
+	memoryCmd.Flags().String("format", "default", "Format for memory export (json or default)")
+	memoryCmd.Flags().Bool("wipe", false, "Wipe (delete) all stored memory data")
+
+
 
 	showCmd := &cobra.Command{
 		Use:     "show MODEL",
@@ -2953,6 +2994,7 @@ Examples:
 		copyCmd,
 		deleteCmd,
 		serveCmd,
+		memoryCmd,
 	} {
 		switch cmd {
 		case runCmd:
@@ -3007,6 +3049,7 @@ Examples:
 		deleteCmd,
 		runnerCmd,
 		gpuDiscoverCmd,
+		memoryCmd,
 		launch.LaunchCmd(checkServerHeartbeat, runInteractiveTUI),
 	)
 

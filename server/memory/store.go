@@ -957,3 +957,27 @@ func (s *LanceDBStore) Export(ctx context.Context) ([]*Memory, []*Conversation, 
 	return memories, conversations, specialMemories, nil
 }
 
+// Wipe clears all data in the store by closing the DB, deleting the directory, and reconnecting.
+func (s *LanceDBStore) Wipe(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_ = s.conn.Close()
+
+	if err := os.RemoveAll(s.dbDir); err != nil {
+		return fmt.Errorf("wipe failed to delete directory: %w", err)
+	}
+
+	if err := os.MkdirAll(s.dbDir, 0o755); err != nil {
+		return fmt.Errorf("wipe failed to recreate directory: %w", err)
+	}
+
+	conn, err := lancedb.Connect(ctx, s.dbDir, nil)
+	if err != nil {
+		return fmt.Errorf("wipe failed to reconnect: %w", err)
+	}
+	s.conn = conn
+	return nil
+}
+
+
