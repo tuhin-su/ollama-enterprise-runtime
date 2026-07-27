@@ -2472,6 +2472,12 @@ func writeChatResponse(c *gin.Context, req api.ChatRequest, ch chan any) {
 func (s *Server) ChatHandler(c *gin.Context) {
 	checkpointStart := time.Now()
 
+	toolHeader := c.GetHeader("X-Tool-Name")
+	userHeader := c.GetHeader("X-User-Name")
+	if toolHeader != "" || userHeader != "" {
+		slog.Info("Ollama client context received", "user", userHeader, "tool", toolHeader)
+	}
+
 	var req api.ChatRequest
 	if err := c.ShouldBindJSON(&req); errors.Is(err, io.EOF) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing request body"})
