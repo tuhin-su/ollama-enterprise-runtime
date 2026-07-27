@@ -2657,12 +2657,11 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		return
 	}
 
+	modelCaps := m.Capabilities()
 	caps := []model.Capability{model.CapabilityCompletion}
-	if len(req.Tools) > 0 || memoryEngine != nil {
+	if len(req.Tools) > 0 || (memoryEngine != nil && slices.Contains(modelCaps, model.CapabilityTools)) {
 		caps = append(caps, model.CapabilityTools)
 	}
-
-	modelCaps := m.Capabilities()
 	if slices.Contains(modelCaps, model.CapabilityThinking) {
 		caps = append(caps, model.CapabilityThinking)
 		if req.Think == nil {
