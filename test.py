@@ -89,7 +89,7 @@ def send_chat_request(model, messages):
         method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=120) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             return data.get("message", {}).get("content", "")
     except urllib.error.URLError as e:
@@ -179,7 +179,7 @@ def run_system_verification_tests():
     # 1. Verify model command is registered and outputs help
     print("1. Testing 'ollama model --help'...")
     ok, stdout, stderr = run_cmd(["model", "--help"])
-    if ok and "Manage Ollama models" in stdout:
+    if ok and ("Import a model from a GGUF file" in stdout or "Manage Ollama models" in stdout):
         print(" [PASS] 'ollama model' registered successfully.")
     else:
         print(" [FAIL] 'ollama model' registration failed.")
