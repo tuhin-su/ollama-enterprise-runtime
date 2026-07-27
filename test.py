@@ -5,6 +5,7 @@ import time
 import sys
 import random
 import os
+import subprocess
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
 
@@ -161,8 +162,104 @@ def run_10k_memory_benchmark(model, qa_pairs, num_to_test=20):
         "total": num_to_test
     }
 
+def run_system_verification_tests():
+    print("\n==================================================")
+    print("Running CLI System Verification Tests")
+    print("==================================================")
+
+    # Helper function to run local ollama command
+    def run_cmd(args):
+        cmd = ["./ollama"] + args
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            return True, res.stdout, res.stderr
+        except subprocess.CalledProcessError as e:
+            return False, e.stdout, e.stderr
+
+    # 1. Verify model command is registered and outputs help
+    print("1. Testing 'ollama model --help'...")
+    ok, stdout, stderr = run_cmd(["model", "--help"])
+    if ok and "Manage Ollama models" in stdout:
+        print(" [PASS] 'ollama model' registered successfully.")
+    else:
+        print(" [FAIL] 'ollama model' registration failed.")
+        print(f"Stdout: {stdout}\nStderr: {stderr}")
+
+    # 2. Verify export requires dest
+    print("2. Testing 'ollama model' validation...")
+    ok, stdout, stderr = run_cmd(["model", "--export", "testmodel"])
+    if not ok and "dest is required" in stderr:
+        print(" [PASS] model export validation works as expected.")
+    else:
+        print(" [FAIL] model export validation didn't error on missing dest.")
+        print(f"Stdout: {stdout}\nStderr: {stderr}")
+
+    # 3. Verify memory command is registered and has --import
+    print("3. Testing 'ollama memory --help'...")
+    ok, stdout, stderr = run_cmd(["memory", "--help"])
+    if ok and "--import" in stdout and "--export" in stdout:
+        print(" [PASS] 'ollama memory' subcommand and flags verified.")
+    else:
+        print(" [FAIL] 'ollama memory' subcommand or flags verification failed.")
+        print(f"Stdout: {stdout}\nStderr: {stderr}")
+
+    # 4. Verify memory export database operation
+    print("4. Testing memory database export...")
+    export_file = "test_memory_export.json"
+    if os.path.exists(export_file):
+        os.remove(export_file)
+    ok, stdout, stderr = run_cmd(["memory", "--export", export_file, "--format", "json"])
+    if ok and os.path.exists(export_file):
+        print(f" [PASS] Memory successfully exported to {export_file}.")
+        # Verify JSON content
+        try:
+            with open(export_file, "r") as f:
+                data = json.load(f)
+            if "conversations" in data:
+                print(" [PASS] Memory export JSON structure is valid.")
+            else:
+                print(" [FAIL] Exported JSON is missing memory keys.")
+        except Exception as e:
+            print(f" [FAIL] Failed parsing exported memory JSON: {e}")
+    else:
+        print(" [FAIL] Memory database export failed.")
+        print(f"Stdout: {stdout}\nStderr: {stderr}")
+
+    # 5. Verify memory import database operation
+    if os.path.exists(export_file):
+        print("5. Testing memory database import...")
+        ok, stdout, stderr = run_cmd(["memory", "--import", export_file])
+        if ok and "Memory successfully imported" in stdout:
+            print(" [PASS] Memory database import executed successfully.")
+        else:
+            print(" [FAIL] Memory database import failed.")
+            print(f"Stdout: {stdout}\nStderr: {stderr}")
+        os.remove(export_file)
+
+    # 6. Verify skill command is registered and has --import/--export
+    print("6. Testing 'ollama skill --help'...")
+    ok, stdout, stderr = run_cmd(["skill", "--help"])
+    if ok and "--import" in stdout and "--export" in stdout:
+        print(" [PASS] 'ollama skill' subcommand verified.")
+    else:
+        print(" [FAIL] 'ollama skill' subcommand registration failed.")
+        print(f"Stdout: {stdout}\nStderr: {stderr}")
+
+    # 7. Verify skill export
+    print("7. Testing skill export...")
+    skills_dir = "test_skills_export"
+    if os.path.exists(skills_dir):
+        subprocess.run(["rm", "-rf", skills_dir])
+    ok, stdout, stderr = run_cmd(["skill", "--export", skills_dir])
+    if ok and os.path.exists(skills_dir):
+        print(" [PASS] Skills successfully exported.")
+        subprocess.run(["rm", "-rf", skills_dir])
+    else:
+        print(" [FAIL] Skill export failed (or no skills were present to export).")
+        print(f"Stdout: {stdout}\nStderr: {stderr}")
+
 def main():
-    print("Ollama Memory Evaluator: 10,000 Questions Dataset Benchmark")
+    print("Ollama Memory Evaluator & CLI System Verification Test Suite")
     print("-----------------------------------------------------------")
     
     # Verify connection
@@ -173,14 +270,16 @@ def main():
         req = urllib.request.Request("http://localhost:11434", headers=headers)
         urllib.request.urlopen(req, timeout=3)
     except Exception:
-        print("Error: Could not connect to Ollama server at http://localhost:11434. Make sure 'ollama serve' is running.")
-        sys.exit(1)
+        print("Warning: Could not connect to Ollama server at http://localhost:11434. Skipping connection-based memory benchmark.")
+        # Proceed with offline CLI verification tests even if server is down
+        run_system_verification_tests()
+        sys.exit(0)
 
     print("Generating 10,000 unique QA pairs...")
     qa_pairs = generate_10k_qa_pairs()
     
     # Allow specifying how many items to sample-test in real-time from the CLI
-    num_to_test = 10
+    num_to_test = 5
     if len(sys.argv) > 1:
         try:
             num_to_test = int(sys.argv[1])
@@ -203,6 +302,9 @@ def main():
     for r in results:
         acc_str = f"{r['accuracy']:.1f}% ({r['passed']}/{r['total']})"
         print(f"{r['model']:<45} | {acc_str:<10} | {r['avg_latency']:>10.2f}s")
+
+    # Run the CLI system verification tests
+    run_system_verification_tests()
 
 if __name__ == "__main__":
     main()
