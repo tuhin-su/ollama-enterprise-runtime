@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/ollama/ollama/envconfig"
 )
 
 // OllamaEmbedder implements EmbeddingProvider by calling Ollama's own
@@ -75,6 +77,9 @@ func (e *OllamaEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]fl
 		return nil, fmt.Errorf("memory embedder: request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if token := envconfig.APIToken(); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := e.client.Do(req)
 	if err != nil {

@@ -3043,11 +3043,10 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 		return
 	}
 
+	memUID := memoryUserID(&req, c.Request.RemoteAddr)
 	ch := make(chan any)
 	go func() {
 		defer close(ch)
-
-		memUID := memoryUserID(&req, c.Request.RemoteAddr)
 
 		var runChat func(currentMessages []api.Message)
 		runChat = func(currentMessages []api.Message) {
@@ -3190,6 +3189,7 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 		runChat(msgs)
 	}()
 
+	ch = collectAndStoreMemories(c.Request.Context(), memUID, &req, ch)
 	writeChatResponse(c, req, ch)
 }
 
