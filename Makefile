@@ -45,14 +45,17 @@ lancedb-bindings:
 	fi
 
 build: lancedb-bindings
-	@echo ">>> Configuring superbuild..."
-	cmake -B build -DCMAKE_INSTALL_PREFIX=$(PREFIX) .
-	@echo ">>> Compiling native payload runner (llama-server)..."
-	cmake --build build --parallel $(PARALLEL_JOBS) --target ollama-llama-server-local
-	@echo ">>> Compiling Ollama Go binary..."
-	export CGO_CFLAGS="-I$$(pwd)/include" && \
-	export CGO_LDFLAGS="$$(pwd)/lib/linux_amd64/liblancedb_go.a -lm" && \
-	go build -o ollama .
+	@echo ">>> Checking if GPU exists..."
+	@if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then \
+		echo ">>> NVIDIA GPU detected! Configuring with CUDA v13 backend..."; \
+		cmake -B build -DCMAKE_INSTALL_PREFIX=$(PREFIX) -DOLLAMA_LLAMA_BACKENDS=cuda_v13 .; \
+	else \
+		echo ">>> No GPU detected. Configuring CPU-only build..."; \
+		cmake -B build -DCMAKE_INSTALL_PREFIX=$(PREFIX) .; \
+	fi
+	@echo ">>> Compiling payloads and binary..."
+	cmake --build build --parallel $(PARALLEL_JOBS)
+	@cp build/ollama .
 	@echo ">>> Build completed successfully! You can run ./ollama serve or run 'make install'."
 
 install:
