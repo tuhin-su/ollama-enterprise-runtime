@@ -2620,6 +2620,40 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		}
 	}
 
+	if countChatImages(req.Messages) > 0 && len(m.ProjectorPaths) == 0 {
+		oldModel := req.Model
+		var foundVision bool
+		models, errList := s.modelCaches.modelList.List(c.Request.Context())
+		if errList == nil && len(models) > 0 {
+			for _, mod := range models {
+				if mod.Name != oldModel {
+					fallbackName := model.ParseName(mod.Name)
+					fallbackName, errName := getExistingName(fallbackName)
+					if errName == nil {
+						if mFallback, errGet := GetModel(fallbackName.String()); errGet == nil {
+							if len(mFallback.ProjectorPaths) > 0 {
+								m = mFallback
+								req.Model = mod.Name
+								name = fallbackName
+								modelRef, _ = parseAndValidateModelRef(req.Model)
+								if fallbackReason != "" {
+									fallbackReason += " "
+								}
+								fallbackReason += fmt.Sprintf("Model '%s' does not support image input. Falling back to vision model '%s'.", oldModel, req.Model)
+								foundVision = true
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+		if !foundVision {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("model '%s' does not support image input and no vision models were found", req.Model)})
+			return
+		}
+	}
+
 	if req.TopLogprobs < 0 || req.TopLogprobs > 20 {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "top_logprobs must be between 0 and 20"})
 		return
