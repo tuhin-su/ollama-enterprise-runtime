@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -1991,7 +1992,16 @@ func (s *Server) ModelRecommendationsExperimentalHandler(c *gin.Context) {
 }
 
 func Serve(ln net.Listener) error {
-	slog.SetDefault(logutil.NewLogger(os.Stderr, envconfig.LogLevel()))
+	cfg := memory.LoadConfig()
+	var writer io.Writer = os.Stderr
+	if cfg.LogPath != "" {
+		if err := os.MkdirAll(filepath.Dir(cfg.LogPath), 0o755); err == nil {
+			if f, err := os.OpenFile(cfg.LogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+				writer = io.MultiWriter(os.Stderr, f)
+			}
+		}
+	}
+	slog.SetDefault(logutil.NewLogger(writer, envconfig.LogLevel()))
 	slog.Info("server config", "env", envconfig.Values())
 	cloudDisabled, _ := internalcloud.Status()
 	slog.Info(fmt.Sprintf("Ollama cloud disabled: %t", cloudDisabled))
@@ -2504,6 +2514,22 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		return
 	}
 
+	var fallbackReason string
+
+	if req.Model == "" {
+		cfg := memory.LoadConfig()
+		if cfg.DefaultModel != "" {
+			req.Model = cfg.DefaultModel
+			fallbackReason = fmt.Sprintf("Model not specified in request. Defaulting to '%s'.", req.Model)
+		} else {
+			models, errList := s.modelCaches.modelList.List(c.Request.Context())
+			if errList == nil && len(models) > 0 {
+				req.Model = models[0].Name
+				fallbackReason = fmt.Sprintf("Model not specified in request. Defaulting to first available model '%s'.", req.Model)
+			}
+		}
+	}
+
 	modelRef, err := parseAndValidateModelRef(req.Model)
 	if err != nil {
 		writeModelRefParseError(c, err, http.StatusBadRequest, "model is required")
@@ -2523,22 +2549,73 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	name := modelRef.Name
 
 	name, err = getExistingName(name)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "model is required"})
-		return
+	var getModelErr error
+	var m *Model
+	if err == nil {
+		m, getModelErr = GetModel(name.String())
+	} else {
+		getModelErr = err
 	}
 
-	m, err := GetModel(name.String())
-	if err != nil {
-		switch {
-		case os.IsNotExist(err):
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("model '%s' not found", req.Model)})
-		case err.Error() == errtypes.InvalidModelNameErrMsg:
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if getModelErr != nil || (modelRef.Source == modelSourceLocal && m != nil && m.Config.RemoteHost != "" && m.Config.RemoteModel != "") {
+		// Try to fallback
+		cfg := memory.LoadConfig()
+		oldModel := req.Model
+		var foundFallback bool
+
+		if cfg.DefaultModel != "" && cfg.DefaultModel != oldModel {
+			fallbackName := model.ParseName(cfg.DefaultModel)
+			fallbackName, errName := getExistingName(fallbackName)
+			if errName == nil {
+				if mFallback, errGet := GetModel(fallbackName.String()); errGet == nil {
+					m = mFallback
+					req.Model = cfg.DefaultModel
+					name = fallbackName
+					modelRef, _ = parseAndValidateModelRef(req.Model)
+					fallbackReason = fmt.Sprintf("Requested model '%s' not found. Falling back to default model '%s'.", oldModel, req.Model)
+					foundFallback = true
+				}
+			}
 		}
-		return
+
+		if !foundFallback {
+			models, errList := s.modelCaches.modelList.List(c.Request.Context())
+			if errList == nil && len(models) > 0 {
+				for _, mod := range models {
+					if mod.Name != oldModel {
+						fallbackName := model.ParseName(mod.Name)
+						fallbackName, errName := getExistingName(fallbackName)
+						if errName == nil {
+							if mFallback, errGet := GetModel(fallbackName.String()); errGet == nil {
+								m = mFallback
+								req.Model = mod.Name
+								name = fallbackName
+								modelRef, _ = parseAndValidateModelRef(req.Model)
+								fallbackReason = fmt.Sprintf("Requested model '%s' not found. Falling back to alternative model '%s'.", oldModel, req.Model)
+								foundFallback = true
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if !foundFallback {
+			if getModelErr != nil {
+				switch {
+				case os.IsNotExist(getModelErr) || errors.Is(getModelErr, os.ErrNotExist):
+					c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("model '%s' not found", req.Model)})
+				case getModelErr.Error() == errtypes.InvalidModelNameErrMsg:
+					c.JSON(http.StatusBadRequest, gin.H{"error": getModelErr.Error()})
+				default:
+					c.JSON(http.StatusInternalServerError, gin.H{"error": getModelErr.Error()})
+				}
+			} else {
+				c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("model '%s' not found", req.Model)})
+			}
+			return
+		}
 	}
 
 	if req.TopLogprobs < 0 || req.TopLogprobs > 20 {
@@ -2727,7 +2804,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	}
 
 	if chatModeForModel(m) == chatExecutionModeNative {
-		s.handleNativeChat(c, req, m, r, opts, msgs, checkpointStart, checkpointLoaded)
+		s.handleNativeChat(c, req, m, r, opts, msgs, checkpointStart, checkpointLoaded, fallbackReason)
 		return
 	}
 
@@ -2772,24 +2849,6 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		return
 	}
 
-	var thinkingState *thinking.Parser
-	openingTag, closingTag := thinking.InferTags(m.Template.Template)
-	if req.Think != nil && req.Think.Bool() && openingTag != "" && closingTag != "" {
-		thinkingState = &thinking.Parser{
-			OpeningTag: openingTag,
-			ClosingTag: closingTag,
-		}
-
-		if strings.HasSuffix(strings.TrimSpace(prompt), openingTag) {
-			thinkingState.AddContent(openingTag)
-		}
-	}
-
-	var toolParser *tools.Parser
-	if len(req.Tools) > 0 && (builtinParser == nil || !builtinParser.HasToolSupport()) {
-		toolParser = tools.NewParser(m.Template.Template, req.Tools)
-	}
-
 	type structuredOutputsState int
 	const (
 		structuredOutputsState_None structuredOutputsState = iota
@@ -2801,193 +2860,383 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	go func() {
 		defer close(ch)
 
-		structuredOutputsState := structuredOutputsState_None
+		var runChat func(currentMessages []api.Message)
+		runChat = func(currentMessages []api.Message) {
+			currentPrompt := prompt
+			currentMedia := media
 
-		for {
-			var tb strings.Builder
-
-			currentFormat := req.Format
-			// structured outputs via double request is enabled when:
-			// 1. the model supports the thinking capability and
-			// 2. it uses a built-in parser or our generic thinking parser
-
-			// Note that the current approach does not work for (potential future)
-			// non-thinking models that emit anything before actual content. This
-			// current approach uses the transition from parsed thinking content to
-			// parsed non-thinking content as the signal to turn constraining on
-
-			forceImmediate := builtinParser != nil && builtinParser.HasThinkingSupport() && req.Think != nil && !req.Think.Bool()
-			if req.Format != nil && structuredOutputsState == structuredOutputsState_None && !forceImmediate && ((builtinParser != nil || thinkingState != nil) && slices.Contains(m.Capabilities(), model.CapabilityThinking)) {
-				currentFormat = nil
-			}
-
-			// sets up new context given parent context per request
-			ctx, cancel := context.WithCancel(c.Request.Context())
-
-			err := r.Completion(ctx, llm.CompletionRequest{
-				Prompt:          prompt,
-				Media:           media,
-				Format:          currentFormat,
-				Options:         opts,
-				Shift:           req.Shift == nil || *req.Shift,
-				Truncate:        truncate,
-				Logprobs:        req.Logprobs,
-				TopLogprobs:     req.TopLogprobs,
-				PreservedTokens: preservedTokensForCompletion(builtinParser),
-				ToolCallTag:     toolCallTagForCompletion(toolParser),
-				LeadingBOS:      leadingBOSForModel(m),
-			}, func(r llm.CompletionResponse) {
-				res := api.ChatResponse{
-					Model:     req.Model,
-					CreatedAt: time.Now().UTC(),
-					Message:   api.Message{Role: "assistant", Content: r.Content},
-					Done:      r.Done,
-					Metrics: api.Metrics{
-						PromptEvalCount:    r.PromptEvalCount,
-						PromptEvalDuration: r.PromptEvalDuration,
-						EvalCount:          r.EvalCount,
-						EvalDuration:       r.EvalDuration,
-					},
-					Logprobs: toAPILogprobs(r.Logprobs),
-				}
-
-				if r.Done {
-					res.DoneReason = r.DoneReason.String()
-					res.TotalDuration = time.Since(checkpointStart)
-					res.LoadDuration = checkpointLoaded.Sub(checkpointStart)
-				}
-
-				if builtinParser != nil {
-					slog.Log(context.TODO(), logutil.LevelTrace, "builtin parser input", "parser", m.Config.Parser, "content", r.Content)
-
-					content, thinking, toolCalls, err := builtinParser.Add(r.Content, r.Done)
-					if err != nil {
-						ch <- gin.H{"error": err.Error()}
-						return
-					}
-
-					res.Message.Content = content
-					res.Message.Thinking = thinking
-					for i := range toolCalls {
-						toolCalls[i].ID = toolCallId()
-					}
-					res.Message.ToolCalls = toolCalls
-
-					tb.WriteString(thinking)
-					// we are now receiving content from the model - we should start applying structured outputs
-					if structuredOutputsState == structuredOutputsState_None && req.Format != nil && tb.String() != "" && res.Message.Content != "" {
-						structuredOutputsState = structuredOutputsState_ReadyToApply
-						cancel()
-						return
-					}
-
-					if res.Message.Content != "" || res.Message.Thinking != "" || len(res.Message.ToolCalls) > 0 || r.Done || len(res.Logprobs) > 0 {
-						slog.Log(context.TODO(), logutil.LevelTrace, "builtin parser output", "parser", m.Config.Parser, "content", content, "thinking", thinking, "toolCalls", toolCalls, "done", r.Done)
-						ch <- res
-					} else {
-						slog.Log(context.TODO(), logutil.LevelTrace, "builtin parser empty output", "parser", m.Config.Parser)
-					}
+			if len(currentMessages) > len(msgs) {
+				var err error
+				currentPrompt, currentMedia, err = chatPrompt(c.Request.Context(), m, r.Tokenize, promptOpts, currentMessages, processedTools, req.Think, truncate)
+				if err != nil {
+					slog.Error("chat prompt error", "error", err)
+					ch <- gin.H{"error": err.Error()}
 					return
 				}
+			}
 
-				if thinkingState != nil {
-					thinkingContent, remainingContent := thinkingState.AddContent(res.Message.Content)
-					if thinkingContent == "" && remainingContent == "" && !r.Done {
-						// need to accumulate more to decide what to send
-						return
-					}
-					res.Message.Thinking = thinkingContent
-					tb.WriteString(thinkingContent)
-					// emit the collected thinking text before restarting with structured outputs and clear unstructured content
-					// to avoid leaking mixed tokens like "</think>Hello"
-					if structuredOutputsState == structuredOutputsState_None && req.Format != nil && tb.String() != "" && remainingContent != "" {
-						structuredOutputsState = structuredOutputsState_ReadyToApply
-						res.Message.Content = ""
-						ch <- res
-						cancel()
-						return
-					}
-					res.Message.Content = remainingContent
+			var thinkingState *thinking.Parser
+			openingTag, closingTag := thinking.InferTags(m.Template.Template)
+			if req.Think != nil && req.Think.Bool() && openingTag != "" && closingTag != "" {
+				thinkingState = &thinking.Parser{
+					OpeningTag: openingTag,
+					ClosingTag: closingTag,
 				}
 
-				if len(req.Tools) > 0 {
-					toolCalls, content := toolParser.Add(res.Message.Content)
-					if len(content) > 0 {
+				if strings.HasSuffix(strings.TrimSpace(currentPrompt), openingTag) {
+					thinkingState.AddContent(openingTag)
+				}
+			}
+
+			var toolParser *tools.Parser
+			if len(req.Tools) > 0 && (builtinParser == nil || !builtinParser.HasToolSupport()) {
+				toolParser = tools.NewParser(m.Template.Template, req.Tools)
+			}
+
+			structuredOutputsState := structuredOutputsState_None
+
+			var fullMessage api.Message
+			var doneResponse api.ChatResponse
+
+			for {
+				var tb strings.Builder
+
+				currentFormat := req.Format
+				forceImmediate := builtinParser != nil && builtinParser.HasThinkingSupport() && req.Think != nil && !req.Think.Bool()
+				if req.Format != nil && structuredOutputsState == structuredOutputsState_None && !forceImmediate && ((builtinParser != nil || thinkingState != nil) && slices.Contains(m.Capabilities(), model.CapabilityThinking)) {
+					currentFormat = nil
+				}
+
+				ctx, cancel := context.WithCancel(c.Request.Context())
+
+				err := r.Completion(ctx, llm.CompletionRequest{
+					Prompt:          currentPrompt,
+					Media:           currentMedia,
+					Format:          currentFormat,
+					Options:         opts,
+					Shift:           req.Shift == nil || *req.Shift,
+					Truncate:        truncate,
+					Logprobs:        req.Logprobs,
+					TopLogprobs:     req.TopLogprobs,
+					PreservedTokens: preservedTokensForCompletion(builtinParser),
+					ToolCallTag:     toolCallTagForCompletion(toolParser),
+					LeadingBOS:      leadingBOSForModel(m),
+				}, func(r llm.CompletionResponse) {
+					res := api.ChatResponse{
+						Model:     req.Model,
+						CreatedAt: time.Now().UTC(),
+						Message:   api.Message{Role: "assistant", Content: r.Content},
+						Done:      r.Done,
+						Metrics: api.Metrics{
+							PromptEvalCount:    r.PromptEvalCount,
+							PromptEvalDuration: r.PromptEvalDuration,
+							EvalCount:          r.EvalCount,
+							EvalDuration:       r.EvalDuration,
+						},
+						Logprobs: toAPILogprobs(r.Logprobs),
+					}
+
+					if r.Done {
+						res.DoneReason = r.DoneReason.String()
+						res.TotalDuration = time.Since(checkpointStart)
+						res.LoadDuration = checkpointLoaded.Sub(checkpointStart)
+						doneResponse = res
+					}
+
+					if builtinParser != nil {
+						slog.Log(context.TODO(), logutil.LevelTrace, "builtin parser input", "parser", m.Config.Parser, "content", r.Content)
+
+						content, thinking, toolCalls, err := builtinParser.Add(r.Content, r.Done)
+						if err != nil {
+							ch <- gin.H{"error": err.Error()}
+							return
+						}
+
 						res.Message.Content = content
-					} else if len(toolCalls) > 0 {
+						res.Message.Thinking = thinking
 						for i := range toolCalls {
 							toolCalls[i].ID = toolCallId()
 						}
 						res.Message.ToolCalls = toolCalls
-						res.Message.Content = ""
-					} else if res.Message.Thinking != "" {
-						// don't return, fall through to send
-					} else {
-						//  Send logprobs while content is being buffered by the parser for tool calls
-						if len(res.Logprobs) > 0 && !r.Done {
-							logprobRes := res
-							logprobRes.Message.Content = ""
-							logprobRes.Message.ToolCalls = nil
-							ch <- logprobRes
+
+						tb.WriteString(thinking)
+						if structuredOutputsState == structuredOutputsState_None && req.Format != nil && tb.String() != "" && res.Message.Content != "" {
+							structuredOutputsState = structuredOutputsState_ReadyToApply
+							cancel()
+							return
 						}
 
-						if r.Done {
-							res.Message.Content = toolParser.Content()
-							ch <- res
+						if res.Message.Content != "" || res.Message.Thinking != "" || len(res.Message.ToolCalls) > 0 || r.Done || len(res.Logprobs) > 0 {
+							slog.Log(context.TODO(), logutil.LevelTrace, "builtin parser output", "parser", m.Config.Parser, "content", content, "thinking", thinking, "toolCalls", toolCalls, "done", r.Done)
+
+							if res.Message.Content != "" {
+								fullMessage.Content += res.Message.Content
+							}
+							if res.Message.Thinking != "" {
+								fullMessage.Thinking += res.Message.Thinking
+							}
+							if len(res.Message.ToolCalls) > 0 {
+								fullMessage.ToolCalls = append(fullMessage.ToolCalls, res.Message.ToolCalls...)
+							}
+
+							hasMemoryTool := false
+							for _, tc := range fullMessage.ToolCalls {
+								if IsMemoryTool(tc.Function.Name) {
+									hasMemoryTool = true
+									break
+								}
+							}
+
+							if !hasMemoryTool {
+								ch <- res
+							}
+						} else {
+							slog.Log(context.TODO(), logutil.LevelTrace, "builtin parser empty output", "parser", m.Config.Parser)
+						}
+						return
+					}
+
+					if thinkingState != nil {
+						thinkingContent, remainingContent := thinkingState.AddContent(res.Message.Content)
+						if thinkingContent == "" && remainingContent == "" && !r.Done {
+							return
+						}
+						res.Message.Thinking = thinkingContent
+						tb.WriteString(thinkingContent)
+						if structuredOutputsState == structuredOutputsState_None && req.Format != nil && tb.String() != "" && remainingContent != "" {
+							structuredOutputsState = structuredOutputsState_ReadyToApply
+							res.Message.Content = ""
+
+							if res.Message.Content != "" {
+								fullMessage.Content += res.Message.Content
+							}
+							if res.Message.Thinking != "" {
+								fullMessage.Thinking += res.Message.Thinking
+							}
+							if len(res.Message.ToolCalls) > 0 {
+								fullMessage.ToolCalls = append(fullMessage.ToolCalls, res.Message.ToolCalls...)
+							}
+
+							hasMemoryTool := false
+							for _, tc := range fullMessage.ToolCalls {
+								if IsMemoryTool(tc.Function.Name) {
+									hasMemoryTool = true
+									break
+								}
+							}
+
+							if !hasMemoryTool {
+								ch <- res
+							}
+
+							cancel()
+							return
+						}
+						res.Message.Content = remainingContent
+					}
+
+					if len(req.Tools) > 0 {
+						toolCalls, content := toolParser.Add(res.Message.Content)
+						if len(content) > 0 {
+							res.Message.Content = content
+						} else if len(toolCalls) > 0 {
+							for i := range toolCalls {
+								toolCalls[i].ID = toolCallId()
+							}
+							res.Message.ToolCalls = toolCalls
+							res.Message.Content = ""
+						} else if res.Message.Thinking != "" {
+							// don't return, fall through to send
+						} else {
+							if len(res.Logprobs) > 0 && !r.Done {
+								logprobRes := res
+								logprobRes.Message.Content = ""
+								logprobRes.Message.ToolCalls = nil
+								ch <- logprobRes
+							}
+
+							if r.Done {
+								res.Message.Content = toolParser.Content()
+
+								if res.Message.Content != "" {
+									fullMessage.Content += res.Message.Content
+								}
+								if res.Message.Thinking != "" {
+									fullMessage.Thinking += res.Message.Thinking
+								}
+								if len(res.Message.ToolCalls) > 0 {
+									fullMessage.ToolCalls = append(fullMessage.ToolCalls, res.Message.ToolCalls...)
+								}
+
+								hasMemoryTool := false
+								for _, tc := range fullMessage.ToolCalls {
+									if IsMemoryTool(tc.Function.Name) {
+										hasMemoryTool = true
+										break
+									}
+								}
+
+								if !hasMemoryTool {
+									ch <- res
+								}
+							}
+							return
+						}
+					}
+
+					if res.Message.Content != "" {
+						fullMessage.Content += res.Message.Content
+					}
+					if res.Message.Thinking != "" {
+						fullMessage.Thinking += res.Message.Thinking
+					}
+					if len(res.Message.ToolCalls) > 0 {
+						fullMessage.ToolCalls = append(fullMessage.ToolCalls, res.Message.ToolCalls...)
+					}
+
+					hasMemoryTool := false
+					for _, tc := range fullMessage.ToolCalls {
+						if IsMemoryTool(tc.Function.Name) {
+							hasMemoryTool = true
+							break
+						}
+					}
+
+					if !hasMemoryTool {
+						ch <- res
+					}
+				})
+
+				if err != nil {
+					if structuredOutputsState == structuredOutputsState_ReadyToApply && strings.Contains(err.Error(), "context canceled") && c.Request.Context().Err() == nil {
+						// only ignores error if it's a context cancellation due to setting structured outputs
+					} else {
+						s.sched.expireRunnersForRuntimeOOM(m, err)
+						var serr api.StatusError
+						if errors.As(err, &serr) {
+							ch <- gin.H{"error": serr.ErrorMessage, "status": serr.StatusCode}
+						} else {
+							ch <- gin.H{"error": err.Error()}
 						}
 						return
 					}
 				}
 
-				ch <- res
-			})
-			if err != nil {
-				if structuredOutputsState == structuredOutputsState_ReadyToApply && strings.Contains(err.Error(), "context canceled") && c.Request.Context().Err() == nil {
-					// only ignores error if it's a context cancellation due to setting structured outputs
-				} else {
-					s.sched.expireRunnersForRuntimeOOM(m, err)
-					var serr api.StatusError
-					if errors.As(err, &serr) {
-						ch <- gin.H{"error": serr.ErrorMessage, "status": serr.StatusCode}
-					} else {
-						ch <- gin.H{"error": err.Error()}
+				if structuredOutputsState == structuredOutputsState_ReadyToApply {
+					structuredOutputsState = structuredOutputsState_Applying
+					msg := api.Message{
+						Role:     "assistant",
+						Thinking: tb.String(),
 					}
-					return
+
+					currentMessages = append(currentMessages, msg)
+					currentPrompt, _, err = chatPrompt(c.Request.Context(), m, r.Tokenize, promptOpts, currentMessages, processedTools, req.Think, truncate)
+					if err != nil {
+						slog.Error("chat prompt error applying structured outputs", "error", err)
+						ch <- gin.H{"error": err.Error()}
+						return
+					}
+					if shouldUseHarmony(m) || (builtinParser != nil && m.Config.Parser == "harmony") {
+						currentPrompt += "<|end|><|start|>assistant<|channel|>final<|message|>"
+					}
+					continue
+				}
+
+				break
+			}
+
+			// Check if we have memory tool calls to execute
+			var memoryCalls []api.ToolCall
+			for _, tc := range fullMessage.ToolCalls {
+				if IsMemoryTool(tc.Function.Name) {
+					memoryCalls = append(memoryCalls, tc)
 				}
 			}
 
-			// ignored structured outputs cancellation falls through to here, start a new request with the structured outputs and updated prompt. use the
-			if structuredOutputsState == structuredOutputsState_ReadyToApply {
-				structuredOutputsState = structuredOutputsState_Applying
-				msg := api.Message{
-					Role:     "assistant",
-					Thinking: tb.String(),
+			if len(memoryCalls) > 0 {
+				fullMessage.Role = "assistant"
+				newMessages := append(currentMessages, fullMessage)
+
+				for _, tc := range memoryCalls {
+					var resultStr string
+					var execErr error
+
+					if IsChainTool(tc.Function.Name) {
+						// Chain pipeline: stream progress messages to the user in real-time
+						streamProgress := func(msg string) {
+							ch <- api.ChatResponse{
+								Model:     req.Model,
+								CreatedAt: time.Now().UTC(),
+								Message:   api.Message{Role: "assistant", Content: msg + "\n"},
+							}
+						}
+						cfg := memory.LoadConfig()
+						defaultModelForChain := cfg.DefaultModel
+						if defaultModelForChain == "" {
+							defaultModelForChain = req.Model
+						}
+						resultStr, execErr = s.ExecuteChainPipelineStreaming(c.Request.Context(), tc, defaultModelForChain, streamProgress)
+					} else {
+						resultStr, execErr = s.ExecuteMemoryTool(c.Request.Context(), memUID, tc)
+					}
+
+					if execErr != nil {
+						resultStr = fmt.Sprintf(`{"error": %q}`, execErr.Error())
+					}
+					newMessages = append(newMessages, api.Message{
+						Role:       "tool",
+						Content:    resultStr,
+						ToolCallID: tc.ID,
+					})
 				}
 
-				msgs = append(msgs, msg)
-				prompt, _, err = chatPrompt(c.Request.Context(), m, r.Tokenize, promptOpts, msgs, processedTools, req.Think, truncate)
-				if err != nil {
-					slog.Error("chat prompt error applying structured outputs", "error", err)
-					ch <- gin.H{"error": err.Error()}
-					return
-				}
-				// force constraining by terminating thinking header, the parser is already at this state
-				// when the last message is thinking, the rendered for gpt-oss cannot disambiguate between having the
-				// model continue thinking or ending thinking and outputting the final message.
-				// TODO(parthsareen): consider adding prefill disambiguation logic to the renderer for structured outputs.
-				if shouldUseHarmony(m) || (builtinParser != nil && m.Config.Parser == "harmony") {
-					prompt += "<|end|><|start|>assistant<|channel|>final<|message|>"
-				}
-				continue
+				// Re-run chat with the new history
+				runChat(newMessages)
+				return
 			}
 
-			break
+			// Save conversation turn when final assistant response is ready and no memory tool calls remain
+			if doneResponse.Done && memoryEngine != nil {
+				var lastUserMsg string
+				for i := len(currentMessages) - 1; i >= 0; i-- {
+					if currentMessages[i].Role == "user" {
+						lastUserMsg = currentMessages[i].Content
+						break
+					}
+				}
+				if lastUserMsg != "" {
+					memoryEngine.ProcessResponse(c.Request.Context(), &memory.MemoryRequest{
+						UserID:   memUID,
+						Model:    req.Model,
+						Messages: toMemoryMessages(currentMessages),
+					}, fullMessage.Content)
+				}
+			}
 		}
+
+		runChat(msgs)
 	}()
 
 	// --- Memory subsystem: capture reply and store new memories async ---
 	ch = collectAndStoreMemories(c.Request.Context(), memUID, &req, ch)
 	// --------------------------------------------------------------------
+
+	if fallbackReason != "" {
+		originalCh := ch
+		ch = make(chan any)
+		go func() {
+			defer close(ch)
+			ch <- api.ChatResponse{
+				Model:     req.Model,
+				CreatedAt: time.Now().UTC(),
+				Message:   api.Message{Role: "assistant", Content: "[System Notice: " + fallbackReason + "]\n\n"},
+			}
+			for item := range originalCh {
+				ch <- item
+			}
+		}()
+	}
+
 	writeChatResponse(c, req, ch)
 }
 
@@ -2997,7 +3246,7 @@ func prepareNativeChatRequest(ctx context.Context, m *Model, r llm.LlamaServer, 
 	return nativeReq, err
 }
 
-func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model, r llm.LlamaServer, opts *api.Options, msgs []api.Message, checkpointStart, checkpointLoaded time.Time) {
+func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model, r llm.LlamaServer, opts *api.Options, msgs []api.Message, checkpointStart, checkpointLoaded time.Time, fallbackReason string) {
 	truncate := req.Truncate == nil || *req.Truncate
 	nativeReq, err := prepareNativeChatRequest(c.Request.Context(), m, r, opts, llm.ChatRequest{
 		Messages:    msgs,
@@ -3136,9 +3385,30 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 				newMessages := append(currentMessages, fullMessage)
 
 				for _, tc := range memoryCalls {
-					resultStr, err := ExecuteMemoryTool(c.Request.Context(), memUID, tc)
-					if err != nil {
-						resultStr = fmt.Sprintf(`{"error": %q}`, err.Error())
+					var resultStr string
+					var execErr error
+
+					if IsChainTool(tc.Function.Name) {
+						// Chain pipeline: stream progress to user in real-time
+						streamProgress := func(msg string) {
+							ch <- api.ChatResponse{
+								Model:     req.Model,
+								CreatedAt: time.Now().UTC(),
+								Message:   api.Message{Role: "assistant", Content: msg + "\n"},
+							}
+						}
+						cfg := memory.LoadConfig()
+						defaultModelForChain := cfg.DefaultModel
+						if defaultModelForChain == "" {
+							defaultModelForChain = req.Model
+						}
+						resultStr, execErr = s.ExecuteChainPipelineStreaming(c.Request.Context(), tc, defaultModelForChain, streamProgress)
+					} else {
+						resultStr, execErr = s.ExecuteMemoryTool(c.Request.Context(), memUID, tc)
+					}
+
+					if execErr != nil {
+						resultStr = fmt.Sprintf(`{"error": %q}`, execErr.Error())
 					}
 					newMessages = append(newMessages, api.Message{
 						Role:       "tool",
@@ -3190,6 +3460,23 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 	}()
 
 	ch = collectAndStoreMemories(c.Request.Context(), memUID, &req, ch)
+
+	if fallbackReason != "" {
+		originalCh := ch
+		ch = make(chan any)
+		go func() {
+			defer close(ch)
+			ch <- api.ChatResponse{
+				Model:     req.Model,
+				CreatedAt: time.Now().UTC(),
+				Message:   api.Message{Role: "assistant", Content: "[System Notice: " + fallbackReason + "]\n\n"},
+			}
+			for item := range originalCh {
+				ch <- item
+			}
+		}()
+	}
+
 	writeChatResponse(c, req, ch)
 }
 

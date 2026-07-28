@@ -23,10 +23,16 @@ func generateServerConfigIfNotExist(home string) {
 		defaultServerCfg := `{
   "api_token": "",
   "disable_ollama_cloud": false,
+  "default_model": "",
+  "log_path": "",
   "memory": {
     "enabled": false,
     "db_path": "",
     "embedding_model": "nomic-embed-text",
+    "default_model": "",
+    "log_path": "",
+    "chain_enabled": true,
+    "chain_max_steps": 10,
     "top_k": 20,
     "similarity_threshold": 0.65,
     "importance_threshold": 0.3,
@@ -49,10 +55,13 @@ func generateServerConfigIfNotExist(home string) {
   }
 }`
 		dbPath := filepath.Join(home, ".ollama", "memory.lance")
+		logPath := filepath.Join(home, ".ollama", "server.log")
 		var m map[string]any
 		if err := json.Unmarshal([]byte(defaultServerCfg), &m); err == nil {
+			m["log_path"] = logPath
 			if mem, ok := m["memory"].(map[string]any); ok {
 				mem["db_path"] = dbPath
+				mem["log_path"] = logPath
 			}
 			if updated, err := json.MarshalIndent(m, "", "  "); err == nil {
 				_ = os.MkdirAll(filepath.Dir(path), 0o755)
@@ -61,6 +70,7 @@ func generateServerConfigIfNotExist(home string) {
 		}
 	}
 }
+
 
 func getHostFromConfig() string {
 	home, err := os.UserHomeDir()

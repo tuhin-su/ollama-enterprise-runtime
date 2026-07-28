@@ -342,8 +342,10 @@ func (s *LanceDBStore) List(ctx context.Context, userID string, opts ListOptions
 	defer table.Close()
 
 	var filters []string
-	escapedUserID := strings.ReplaceAll(userID, "'", "''")
-	filters = append(filters, fmt.Sprintf("user_id = '%s'", escapedUserID))
+	if userID != "" {
+		escapedUserID := strings.ReplaceAll(userID, "'", "''")
+		filters = append(filters, fmt.Sprintf("user_id = '%s'", escapedUserID))
+	}
 
 	if opts.Type != "" {
 		filters = append(filters, fmt.Sprintf("type = '%s'", string(opts.Type)))
@@ -366,7 +368,18 @@ func (s *LanceDBStore) List(ctx context.Context, userID string, opts ListOptions
 	filterStr := strings.Join(filters, " AND ")
 
 	var rows []map[string]interface{}
-	if opts.Limit > 0 || opts.Offset > 0 {
+	if len(filters) == 0 {
+		qConfig := contracts.QueryConfig{}
+		if opts.Limit > 0 {
+			limitVal := opts.Limit
+			qConfig.Limit = &limitVal
+		}
+		if opts.Offset > 0 {
+			offsetVal := opts.Offset
+			qConfig.Offset = &offsetVal
+		}
+		rows, err = table.Select(ctx, qConfig)
+	} else if opts.Limit > 0 || opts.Offset > 0 {
 		limitVal := opts.Limit
 		offsetVal := opts.Offset
 		qConfig := contracts.QueryConfig{

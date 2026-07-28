@@ -21,6 +21,21 @@ type Config struct {
 	// Default: "nomic-embed-text"
 	EmbeddingModel string `json:"embedding_model,omitempty"`
 
+	// DefaultModel is the default fallback model when no model is requested or specified model is missing.
+	DefaultModel string `json:"default_model,omitempty"`
+
+	// LogPath is the path to the system log file.
+	// Default: ~/.ollama/server.log
+	LogPath string `json:"log_path,omitempty"`
+
+	// ChainEnabled activates the model chaining/pipeline feature.
+	// Default: true (when memory is enabled)
+	ChainEnabled bool `json:"chain_enabled"`
+
+	// ChainMaxSteps is the maximum number of steps allowed in a single chain pipeline.
+	// Default: 10
+	ChainMaxSteps int `json:"chain_max_steps,omitempty"`
+
 	// TopK is the number of vector results to retrieve before ranking.
 	// Default: 20
 	TopK int `json:"top_k,omitempty"`
@@ -109,11 +124,15 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 func DefaultConfig() Config {
 	home, _ := os.UserHomeDir()
 	dbPath := filepath.Join(home, ".ollama", "memory.lance")
+	logPath := filepath.Join(home, ".ollama", "server.log")
 
 	return Config{
 		Enabled:             false,
 		DBPath:              dbPath,
 		EmbeddingModel:      "nomic-embed-text",
+		LogPath:             logPath,
+		ChainEnabled:        true,
+		ChainMaxSteps:       10,
 		TopK:                20,
 		SimilarityThreshold: 0.65,
 		ImportanceThreshold: 0.3,
@@ -143,6 +162,16 @@ func (c *Config) Merge(other Config) {
 	}
 	if other.EmbeddingModel != "" {
 		c.EmbeddingModel = other.EmbeddingModel
+	}
+	if other.DefaultModel != "" {
+		c.DefaultModel = other.DefaultModel
+	}
+	if other.LogPath != "" {
+		c.LogPath = other.LogPath
+	}
+	c.ChainEnabled = other.ChainEnabled
+	if other.ChainMaxSteps > 0 {
+		c.ChainMaxSteps = other.ChainMaxSteps
 	}
 	if other.TopK > 0 {
 		c.TopK = other.TopK

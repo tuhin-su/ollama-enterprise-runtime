@@ -335,7 +335,9 @@ func minInt(a, b int) int {
 // ---------------------------------------------------------------------------
 
 type serverJSON struct {
-	Memory Config `json:"memory"`
+	Memory       Config `json:"memory"`
+	DefaultModel string `json:"default_model"`
+	LogPath      string `json:"log_path"`
 }
 
 // LoadConfig reads the server config and returns a merged memory Config.
@@ -359,5 +361,11 @@ func LoadConfig() Config {
 	}
 
 	cfg.Merge(sj.Memory)
+	if sj.DefaultModel != "" && cfg.DefaultModel == "" {
+		cfg.DefaultModel = sj.DefaultModel
+	}
+	if sj.LogPath != "" && cfg.LogPath == "" {
+		cfg.LogPath = sj.LogPath
+	}
 	return cfg
 }
