@@ -215,18 +215,33 @@ func (s *Server) ExecuteChainPipeline(
 
 	progressFn("\n📋 **Pipeline Plan:**")
 	for i, task := range chainReq.SubTasks {
+		prompt := task.Prompt
+		if prompt == "" {
+			prompt = task.Description
+			if prompt == "" {
+				prompt = "Please analyze this input."
+			}
+		}
+		
+		cap := task.RequiredCapability
+		if cap == "" {
+			// Auto-detect if they forgot to set required_capability
+			if strings.Contains(strings.ToLower(task.Description), "image") || strings.Contains(strings.ToLower(task.Description), "vision") {
+				cap = "vision"
+				task.RequiredCapability = "vision"
+			} else {
+				cap = "general"
+			}
+		}
+
 		selectedModel := s.selectModelForTask(task, availableModels, defaultModelName)
 		pipeline.Steps = append(pipeline.Steps, ChainStep{
 			StepIndex: i + 1,
 			ModelName: selectedModel,
-			Prompt:    task.Prompt,
+			Prompt:    prompt,
 			Status:    "pending",
-			InputSize: len(task.Prompt),
+			InputSize: len(prompt),
 		})
-		cap := task.RequiredCapability
-		if cap == "" {
-			cap = "general"
-		}
 		progressFn(fmt.Sprintf("  %d. `%s` → **%s** [%s]", i+1, selectedModel, task.Description, cap))
 	}
 

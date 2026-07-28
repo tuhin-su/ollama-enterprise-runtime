@@ -2632,7 +2632,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		// Inject instruction to the model
 		sysNote := api.Message{
 			Role: "system",
-			Content: "[System: The user attached an image, but your current model architecture does not support direct image input. To process this image, you MUST use the 'chain_request' tool to delegate a subtask to a 'vision' model. The image is stored in context and will be automatically forwarded to the vision model during tool execution. Formulate a prompt for the vision model to extract whatever information you need to answer the user's query.]",
+			Content: "[System: The user attached an image, but your current model architecture does not support direct image input. To process this image, you MUST use the 'chain_request' tool to delegate a subtask. You MUST set `required_capability` to 'vision' for the subtask, and provide a clear `prompt` for the vision model explaining exactly what you want it to look for. The image is stored in context and will be automatically forwarded to the vision model during tool execution.]",
 		}
 		
 		// Prepend to messages or insert after the last system message
