@@ -221,7 +221,69 @@ func GetMemoryTools() api.Tools {
 
 	// Append chain pipeline tools
 	memTools = append(memTools, GetChainTools()...)
+
+	// Append task scheduler tools
+	memTools = append(memTools, GetSchedulerTools()...)
+
 	return memTools
+}
+
+// GetSchedulerTools returns the schedule_task tool definition.
+func GetSchedulerTools() api.Tools {
+	schedProps := api.NewToolPropertiesMap()
+	schedProps.Set("action", api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "The scheduler action: 'schedule' (create a new job), 'list' (show all jobs), 'cancel' (stop a pending job), 'get_result' (fetch completed job output), or 'delete' (remove a job).",
+		Enum:        []any{"schedule", "list", "cancel", "get_result", "delete"},
+	})
+	schedProps.Set("prompt", api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "The prompt text to send to the model when the job runs. Required for 'schedule'.",
+	})
+	schedProps.Set("prompt_id", api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "A human-readable label for the job (e.g. 'daily-summary', 'morning-briefing'). Used as the job name.",
+	})
+	schedProps.Set("model", api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "The Ollama model to run the prompt with. Omit to use the server default model.",
+	})
+	schedProps.Set("system_prompt", api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "Optional system message to prepend to the prompt when the job runs.",
+	})
+	schedProps.Set("run_at", api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "When to run the job. Accepts RFC3339 ('2026-01-15T14:30:00Z'), relative duration ('in 5m', '2h30m', 'in 1 hour'), or leave empty when using cron.",
+	})
+	schedProps.Set("cron", api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "Standard 5-field cron expression for recurring jobs, e.g. '0 9 * * 1-5' (weekdays at 9 AM), '*/30 * * * *' (every 30 min).",
+	})
+	schedProps.Set("job_id", api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "The job ID for 'cancel', 'get_result', or 'delete' actions.",
+	})
+	schedProps.Set("status_filter", api.ToolProperty{
+		Type:        api.PropertyType{"string"},
+		Description: "Filter 'list' results by status: 'pending', 'running', 'done', 'failed', 'cancelled'. Leave empty to list all.",
+		Enum:        []any{"pending", "running", "done", "failed", "cancelled", ""},
+	})
+
+	return api.Tools{
+		{
+			Type: "function",
+			Function: api.ToolFunction{
+				Name:        "schedule_task",
+				Description: "Schedule a prompt to be sent to an Ollama model at a specific time, after a delay, or on a recurring cron schedule. Results are stored and retrievable. Use this to automate tasks, set reminders, create periodic summaries, or run background analysis.",
+				Parameters: api.ToolFunctionParameters{
+					Type:       "object",
+					Properties: schedProps,
+					Required:   []string{"action"},
+				},
+			},
+		},
+	}
 }
 
 // ExecuteMemoryTool runs a memory tool against the LanceDB store and returns the result as string/JSON.
@@ -744,15 +806,198 @@ func (s *Server) ExecuteMemoryTool(ctx context.Context, userID string, toolCall 
 		resBytes, _ := json.Marshal(resMap)
 		return string(resBytes), nil
 
+	case "schedule_task":
+		return s.executeScheduleTask(ctx, toolCall.Function.Arguments.ToMap())
+
 	default:
 		return "", fmt.Errorf("unknown memory tool: %s", toolCall.Function.Name)
 	}
 }
+
 
 // IsMemoryTool returns true if the tool name belongs to one of the memory tools.
 func IsMemoryTool(name string) bool {
 	return name == "save_memory" || name == "list_memories" || name == "delete_memory" ||
 		name == "save_special_memory" || name == "list_special_memories" || name == "delete_special_memory" ||
 		name == "read_system_logs" || name == "check_data_flow" || name == "restart_server" ||
-		name == "system_tool" || name == "chain_request"
+		name == "system_tool" || name == "chain_request" || name == "schedule_task"
+}
+
+// executeScheduleTask handles the schedule_task tool call.
+func (s *Server) executeScheduleTask(ctx context.Context, args map[string]any) (string, error) {
+	action, _ := args["action"].(string)
+	if action == "" {
+		return "", fmt.Errorf("action is required")
+	}
+
+	if globalScheduler == nil {
+		// Lazy-init if not yet running (memory might be disabled but scheduler should still work)
+		initTaskScheduler(ctx, s)
+	}
+
+	resJSON := func(v any) (string, error) {
+		b, err := json.Marshal(v)
+		return string(b), err
+	}
+
+	switch action {
+
+	case "schedule":
+		prompt, _ := args["prompt"].(string)
+		if strings.TrimSpace(prompt) == "" {
+			return "", fmt.Errorf("prompt is required for 'schedule'")
+		}
+
+		runAtStr, _ := args["run_at"].(string)
+		cronExpr, _ := args["cron"].(string)
+
+		if runAtStr == "" && cronExpr == "" {
+			return "", fmt.Errorf("either run_at or cron is required")
+		}
+
+		var runAt time.Time
+		if runAtStr != "" {
+			var err error
+			runAt, err = ParseScheduleTime(runAtStr)
+			if err != nil {
+				return "", fmt.Errorf("invalid run_at: %w", err)
+			}
+		}
+
+		modelName, _ := args["model"].(string)
+		systemPrompt, _ := args["system_prompt"].(string)
+		promptID, _ := args["prompt_id"].(string)
+
+		job := &ScheduledJob{
+			PromptID:     promptID,
+			Prompt:       prompt,
+			Model:        modelName,
+			SystemPrompt: systemPrompt,
+			RunAt:        runAt,
+			CronExpr:     cronExpr,
+		}
+
+		id, err := globalScheduler.AddJob(job)
+		if err != nil {
+			return "", fmt.Errorf("failed to schedule job: %w", err)
+		}
+
+		slog.Info("schedule_task: job created", "id", id, "prompt_id", promptID, "run_at", runAt, "cron", cronExpr)
+
+		resultMap := map[string]any{
+			"status":    "scheduled",
+			"job_id":    id,
+			"prompt_id": promptID,
+			"model":     modelName,
+			"run_at":    func() string {
+				if !runAt.IsZero() { return runAt.Format(time.RFC3339) }
+				return ""
+			}(),
+			"cron":      cronExpr,
+			"message":   fmt.Sprintf("Job '%s' scheduled (ID: %s)", promptID, id),
+		}
+		if job.NextRunAt != nil {
+			resultMap["next_run_at"] = job.NextRunAt.Format(time.RFC3339)
+		}
+		return resJSON(resultMap)
+
+	case "list":
+		statusFilter, _ := args["status_filter"].(string)
+		jobs := globalScheduler.ListJobs(statusFilter)
+
+		type jobSummary struct {
+			ID          string `json:"id"`
+			PromptID    string `json:"prompt_id"`
+			Model       string `json:"model"`
+			Status      string `json:"status"`
+			RunAt       string `json:"run_at"`
+			Cron        string `json:"cron,omitempty"`
+			NextRunAt   string `json:"next_run_at,omitempty"`
+			RunCount    int    `json:"run_count"`
+			PromptSnip  string `json:"prompt_snippet"`
+			HasResult   bool   `json:"has_result"`
+		}
+
+		var summaries []jobSummary
+		for _, j := range jobs {
+			snip := j.Prompt
+			if len(snip) > 80 {
+				snip = snip[:77] + "..."
+			}
+			s := jobSummary{
+				ID:         j.ID,
+				PromptID:   j.PromptID,
+				Model:      j.Model,
+				Status:     string(j.Status),
+				RunAt:      j.RunAt.Format(time.RFC3339),
+				Cron:       j.CronExpr,
+				RunCount:   j.RunCount,
+				PromptSnip: snip,
+				HasResult:  j.Result != "",
+			}
+			if j.NextRunAt != nil {
+				s.NextRunAt = j.NextRunAt.Format(time.RFC3339)
+			}
+			summaries = append(summaries, s)
+		}
+
+		resultMap := map[string]any{
+			"status": "ok",
+			"count":  len(summaries),
+			"jobs":   summaries,
+		}
+		return resJSON(resultMap)
+
+	case "cancel":
+		jobID, _ := args["job_id"].(string)
+		if jobID == "" {
+			return "", fmt.Errorf("job_id is required for 'cancel'")
+		}
+		if err := globalScheduler.CancelJob(jobID); err != nil {
+			return "", err
+		}
+		return resJSON(map[string]any{"status": "cancelled", "job_id": jobID})
+
+	case "get_result":
+		jobID, _ := args["job_id"].(string)
+		if jobID == "" {
+			return "", fmt.Errorf("job_id is required for 'get_result'")
+		}
+		j := globalScheduler.GetJob(jobID)
+		if j == nil {
+			return "", fmt.Errorf("job '%s' not found", jobID)
+		}
+		resultMap := map[string]any{
+			"job_id":    j.ID,
+			"prompt_id": j.PromptID,
+			"status":    string(j.Status),
+			"run_count": j.RunCount,
+		}
+		if j.Result != "" {
+			resultMap["result"] = j.Result
+		}
+		if j.Error != "" {
+			resultMap["error"] = j.Error
+		}
+		if j.CompletedAt != nil {
+			resultMap["completed_at"] = j.CompletedAt.Format(time.RFC3339)
+		}
+		if j.NextRunAt != nil {
+			resultMap["next_run_at"] = j.NextRunAt.Format(time.RFC3339)
+		}
+		return resJSON(resultMap)
+
+	case "delete":
+		jobID, _ := args["job_id"].(string)
+		if jobID == "" {
+			return "", fmt.Errorf("job_id is required for 'delete'")
+		}
+		if err := globalScheduler.DeleteJob(jobID); err != nil {
+			return "", err
+		}
+		return resJSON(map[string]any{"status": "deleted", "job_id": jobID})
+
+	default:
+		return "", fmt.Errorf("unknown schedule_task action: %s", action)
+	}
 }

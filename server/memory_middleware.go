@@ -44,23 +44,31 @@ func shutdownMemoryEngine() {
 	}
 }
 
-// chainSystemInstructions is prepended to the system prompt when chain_request
-// is available. It tells the model exactly when and how to use it.
+// chainSystemInstructions is appended to the system prompt when memory tools
+// are available. It tells the model exactly when and how to use each tool.
 const chainSystemInstructions = `
 ## Model Chaining (chain_request tool)
-You have access to a multi-model pipeline orchestrator. Use the chain_request tool when:
-- The user asks for something that requires a capability you lack (vision, image generation, audio, specialized code, math proofs, embeddings, etc.)
-- The task benefits from multiple specialist models working in sequence
-- You detect that a different model would produce significantly better results for part of the request
+Use chain_request when the user's request needs capabilities you lack (vision, image generation, audio, specialized code, math, embeddings, etc.) or when multiple specialist models would produce better results. The system will:
+1. Unload you temporarily to free memory
+2. Load specialist model(s) sequentially, passing outputs between steps
+3. Reload you and return aggregated results for your final answer
+The user sees live progress for every step.
 
-When you call chain_request, the system will:
-1. Unload you from memory temporarily
-2. Load the best-matching specialist model(s) from the local model list
-3. Run each step sequentially, passing outputs between steps
-4. Reload you and return the aggregated results for your final answer
+## Task Scheduler (schedule_task tool)
+Use schedule_task to run prompts at a future time or on a recurring schedule. Actions:
+- schedule: create a job — requires prompt + run_at (e.g. "in 5m", "2h30m", RFC3339) or cron ("*/5 * * * *")
+- list:     show all scheduled jobs (optionally filter by status)
+- cancel:   stop a pending job by job_id
+- get_result: retrieve the output of a completed job by job_id
+- delete:   permanently remove a job by job_id
 
-The user will see live progress for every step. Use this tool proactively — it is better to delegate than to produce a poor answer alone.
+Examples of when to use schedule_task:
+- "Remind me in 1 hour" → schedule with run_at: "in 1h"
+- "Summarise the news every morning at 9" → cron: "0 9 * * *"
+- "Run this analysis at midnight" → run_at: RFC3339 timestamp
+- "What did the 3 AM job produce?" → get_result with job_id
 `
+
 
 // injectMemoryIntoMessages enriches the message list with relevant memories
 // from past sessions. It replaces (or prepends) the system message with an

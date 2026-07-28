@@ -2063,6 +2063,9 @@ func Serve(ln net.Listener) error {
 	// No-op when memory.enabled is false (the default).
 	initMemoryEngine(ctx)
 
+	// Task scheduler — always enabled, persists jobs to ~/.ollama/scheduler.json.
+	initTaskScheduler(ctx, s)
+
 	slog.Info(fmt.Sprintf("Listening on %s (version %s)", ln.Addr(), version.Version))
 	srvr := &http.Server{
 		// Use http.DefaultServeMux so we get net/http/pprof for
@@ -2085,6 +2088,7 @@ func Serve(ln net.Listener) error {
 		schedDone()
 		sched.unloadAllRunners()
 		shutdownMemoryEngine()
+		shutdownTaskScheduler()
 		done()
 	}()
 
