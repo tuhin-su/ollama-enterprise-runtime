@@ -2524,12 +2524,10 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		cfg := memory.LoadConfig()
 		if cfg.DefaultModel != "" {
 			req.Model = cfg.DefaultModel
-			fallbackReason = fmt.Sprintf("Model not specified in request. Defaulting to '%s'.", req.Model)
 		} else {
 			models, errList := s.modelCaches.modelList.List(c.Request.Context())
 			if errList == nil && len(models) > 0 {
 				req.Model = models[0].Name
-				fallbackReason = fmt.Sprintf("Model not specified in request. Defaulting to first available model '%s'.", req.Model)
 			}
 		}
 	}

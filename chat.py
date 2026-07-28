@@ -47,7 +47,7 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DEFAULT_HOST  = "http://localhost:11434"
-DEFAULT_MODEL = "qwen2.5-vl-7b:latest"
+DEFAULT_MODEL = ""
 CHAT_ENDPOINT = "/api/chat"
 MEMORY_NOTE   = "(Memory context injected automatically by the server)"
 
@@ -97,7 +97,10 @@ class OllamaClient:
                     continue
 
                 if "error" in chunk:
-                    raise RuntimeError(f"Server error: {chunk['error']}")
+                    err_msg = chunk["error"]
+                    if isinstance(err_msg, dict):
+                        err_msg = err_msg.get("message", str(err_msg))
+                    raise RuntimeError(f"Server error: {err_msg}")
 
                 content = chunk.get("message", {}).get("content", "")
                 if content:
@@ -127,7 +130,10 @@ class OllamaClient:
         data = resp.json()
 
         if "error" in data:
-            raise RuntimeError(f"Server error: {data['error']}")
+            err_msg = data["error"]
+            if isinstance(err_msg, dict):
+                err_msg = err_msg.get("message", str(err_msg))
+            raise RuntimeError(f"Server error: {err_msg}")
 
         return data.get("message", {}).get("content", "")
 
@@ -473,7 +479,10 @@ def chat_loop(args: argparse.Namespace):
 
         # ── Add assistant reply to history ────────────────────────────────────
         if full_reply:
-            history.append({"role": "assistant", "content": full_reply})
+            import re
+            cleaned_reply = re.sub(r'^\[System Notice: .*?\]\n\n', '', full_reply)
+            if cleaned_reply:
+                history.append({"role": "assistant", "content": cleaned_reply})
 
         print_separator()
 
