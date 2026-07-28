@@ -44,6 +44,24 @@ func shutdownMemoryEngine() {
 	}
 }
 
+// chainSystemInstructions is prepended to the system prompt when chain_request
+// is available. It tells the model exactly when and how to use it.
+const chainSystemInstructions = `
+## Model Chaining (chain_request tool)
+You have access to a multi-model pipeline orchestrator. Use the chain_request tool when:
+- The user asks for something that requires a capability you lack (vision, image generation, audio, specialized code, math proofs, embeddings, etc.)
+- The task benefits from multiple specialist models working in sequence
+- You detect that a different model would produce significantly better results for part of the request
+
+When you call chain_request, the system will:
+1. Unload you from memory temporarily
+2. Load the best-matching specialist model(s) from the local model list
+3. Run each step sequentially, passing outputs between steps
+4. Reload you and return the aggregated results for your final answer
+
+The user will see live progress for every step. Use this tool proactively — it is better to delegate than to produce a poor answer alone.
+`
+
 // injectMemoryIntoMessages enriches the message list with relevant memories
 // from past sessions. It replaces (or prepends) the system message with an
 // enriched version that includes memory context.
@@ -55,20 +73,33 @@ func injectMemoryIntoMessages(ctx context.Context, userID string, req *api.ChatR
 		return msgs
 	}
 
+	cfg := memory.LoadConfig()
+
+	// Inject memory tools when the model supports tool calls
 	if hasTools {
 		req.Tools = append(req.Tools, GetMemoryTools()...)
-		return msgs
 	}
 
 	// Derive the current system prompt from the message list
 	var systemPrompt string
-	for _, m := range msgs {
+	var systemIdx int = -1
+	for i, m := range msgs {
 		if m.Role == "system" {
 			systemPrompt = m.Content
+			systemIdx = i
 			break
 		}
 	}
 
+	// Build enriched system prompt
+	enrichedSystem := systemPrompt
+
+	// Append chain instructions when chain is enabled and model has tools
+	if hasTools && cfg.ChainEnabled {
+		enrichedSystem = strings.TrimRight(enrichedSystem, "\n") + chainSystemInstructions
+	}
+
+	// Retrieve relevant memories and append them
 	memReq := &memory.MemoryRequest{
 		UserID:       userID,
 		Model:        req.Model,
@@ -79,37 +110,44 @@ func injectMemoryIntoMessages(ctx context.Context, userID string, req *api.ChatR
 	memResp, err := memoryEngine.ProcessRequest(ctx, memReq)
 	if err != nil {
 		slog.Warn("memory: ProcessRequest failed", "error", err)
-		return msgs
+	} else if memResp.EnrichedSystem != "" && memResp.EnrichedSystem != systemPrompt {
+		// Memory engine produced enriched context — prefer it as the base
+		// but keep chain instructions if we added them
+		if hasTools && cfg.ChainEnabled {
+			enrichedSystem = memResp.EnrichedSystem + chainSystemInstructions
+		} else {
+			enrichedSystem = memResp.EnrichedSystem
+		}
+		slog.Debug("memory: injected memories",
+			"user", userID,
+			"memories", len(memResp.RelevantMemories),
+			"tokens", memResp.ContextUsed,
+		)
 	}
 
-	// Nothing useful retrieved
-	if memResp.EnrichedSystem == "" || memResp.EnrichedSystem == systemPrompt {
+	// Nothing changed — return original
+	if enrichedSystem == systemPrompt {
 		return msgs
 	}
 
 	// Replace existing system message or prepend a new one
 	enriched := make([]api.Message, 0, len(msgs)+1)
-	replaced := false
-	for _, m := range msgs {
-		if m.Role == "system" {
-			enriched = append(enriched, api.Message{Role: "system", Content: memResp.EnrichedSystem})
-			replaced = true
-		} else {
-			enriched = append(enriched, m)
+	if systemIdx >= 0 {
+		for i, m := range msgs {
+			if i == systemIdx {
+				enriched = append(enriched, api.Message{Role: "system", Content: enrichedSystem})
+			} else {
+				enriched = append(enriched, m)
+			}
 		}
-	}
-	if !replaced {
+	} else {
 		// Prepend system message
-		enriched = append([]api.Message{{Role: "system", Content: memResp.EnrichedSystem}}, enriched...)
+		enriched = append([]api.Message{{Role: "system", Content: enrichedSystem}}, msgs...)
 	}
 
-	slog.Debug("memory: injected memories",
-		"user", userID,
-		"memories", len(memResp.RelevantMemories),
-		"tokens", memResp.ContextUsed,
-	)
 	return enriched
 }
+
 
 // collectAndStoreMemories wraps a chat response channel. It passes every
 // response through to the caller unchanged while accumulating the full

@@ -149,8 +149,14 @@ func IsChainTool(name string) bool {
 // ────────────────────────────────────────────────────────────────────────────
 
 // ExecuteChainPipeline runs the full chain pipeline on the server.
-// It sends progress messages through the progressFn callback so the user
-// sees every step in real-time.
+// Flow:
+//  1. Unload the default model to free VRAM
+//  2. For each sub-task: load specialist → run → unload specialist
+//  3. Build aggregated synthesis string
+//  4. Return to default model which writes the final answer
+//
+// Every state transition is emitted through progressFn so the user sees
+// exactly what is happening at all times.
 func (s *Server) ExecuteChainPipeline(
 	ctx context.Context,
 	toolCall api.ToolCall,
@@ -191,15 +197,22 @@ func (s *Server) ExecuteChainPipeline(
 		"reason", chainReq.Reason,
 	)
 
-	// ── Step 1: Plan — Select models for each subtask ──
-	progressFn(fmt.Sprintf("🔗 **Chain Pipeline Started** (ID: `%s`)\n📋 Reason: %s\n📊 Steps: %d subtasks planned\n",
-		pipeline.ID, chainReq.Reason, len(chainReq.SubTasks)))
+	// ─── PHASE 1: Plan — resolve model for each subtask ───────────────────────
+	progressFn(fmt.Sprintf(
+		"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"+
+			"🔗 **Model Chain Pipeline** `%s`\n"+
+			"📋 Reason: %s\n"+
+			"📊 Total steps: %d\n"+
+			"🤖 Default model: `%s`\n"+
+			"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+		pipeline.ID, chainReq.Reason, len(chainReq.SubTasks), defaultModelName))
 
 	availableModels, err := s.getAvailableModelsWithCaps(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to list available models: %w", err)
 	}
 
+	progressFn("\n📋 **Pipeline Plan:**")
 	for i, task := range chainReq.SubTasks {
 		selectedModel := s.selectModelForTask(task, availableModels, defaultModelName)
 		pipeline.Steps = append(pipeline.Steps, ChainStep{
@@ -209,14 +222,25 @@ func (s *Server) ExecuteChainPipeline(
 			Status:    "pending",
 			InputSize: len(task.Prompt),
 		})
-		progressFn(fmt.Sprintf("  📌 Step %d: **%s** → model `%s` (%s)",
-			i+1, task.Description, selectedModel, task.RequiredCapability))
+		cap := task.RequiredCapability
+		if cap == "" {
+			cap = "general"
+		}
+		progressFn(fmt.Sprintf("  %d. `%s` → **%s** [%s]", i+1, selectedModel, task.Description, cap))
 	}
 
-	pipeline.Status = "running"
-	progressFn("\n⚡ **Executing Pipeline...**\n")
+	// ─── PHASE 2: Unload default model to free VRAM ───────────────────────────
+	// The default model called us via tool — it holds VRAM. We unload it so the
+	// specialist models can load. It will be reloaded automatically when the
+	// tool result is returned and the default model resumes.
+	progressFn(fmt.Sprintf("\n🔻 **Unloading default model** `%s` to free memory for pipeline...", defaultModelName))
+	s.unloadChainModelAndWait(defaultModelName)
+	progressFn("  ✓ Default model unloaded.")
 
-	// ── Step 2: Execute — Run each step sequentially ──
+	// ─── PHASE 3: Execute each step sequentially ──────────────────────────────
+	pipeline.Status = "running"
+	progressFn("\n⚡ **Executing pipeline steps:**")
+
 	startTime := time.Now()
 	var previousOutput string
 
@@ -233,35 +257,46 @@ func (s *Server) ExecuteChainPipeline(
 		step.Status = "running"
 		stepStart := time.Now()
 
-		// Build prompt with previous context if needed
+		// Build prompt — prepend previous step output if requested
 		fullPrompt := step.Prompt
 		if i < len(chainReq.SubTasks) && chainReq.SubTasks[i].NeedsPreviousOutput && previousOutput != "" {
-			fullPrompt = fmt.Sprintf("## Context from previous step:\n%s\n\n## Your task:\n%s", previousOutput, step.Prompt)
+			fullPrompt = fmt.Sprintf(
+				"## Output from previous step:\n%s\n\n## Your task:\n%s",
+				previousOutput, step.Prompt,
+			)
 			step.InputSize = len(fullPrompt)
 		}
 
-		progressFn(fmt.Sprintf("  ▶️  **Step %d/%d** — Loading `%s`...", step.StepIndex, len(pipeline.Steps), step.ModelName))
+		progressFn(fmt.Sprintf(
+			"\n  ┌─ Step %d/%d ─────────────────────────────\n"+
+				"  │ Model : `%s`\n"+
+				"  │ Task  : %s\n"+
+				"  │ Input : %d chars\n"+
+				"  │ Status: ⏳ loading & running...",
+			step.StepIndex, len(pipeline.Steps),
+			step.ModelName, chainReq.SubTasks[i].Description, step.InputSize))
 
-		// Execute the step using internal chat
-		output, err := s.executeChainStep(ctx, step.ModelName, fullPrompt, defaultModelName)
+		output, execErr := s.executeChainStep(ctx, step.ModelName, fullPrompt, defaultModelName)
 		step.DurationMs = time.Since(stepStart).Milliseconds()
 
-		if err != nil {
+		if execErr != nil {
 			step.Status = "error"
-			step.Error = err.Error()
+			step.Error = execErr.Error()
 			slog.Error("chain step failed",
 				"pipeline_id", pipeline.ID,
 				"step", step.StepIndex,
 				"model", step.ModelName,
-				"error", err,
+				"error", execErr,
 			)
-			progressFn(fmt.Sprintf("  ❌ Step %d **FAILED**: %s (%.1fs)", step.StepIndex, err.Error(), float64(step.DurationMs)/1000))
+			progressFn(fmt.Sprintf(
+				"  │ Status: ❌ FAILED — %s\n"+
+					"  └─ Retrying with default model `%s`...",
+				execErr.Error(), defaultModelName))
 
-			// Try fallback to default model for this step
-			progressFn(fmt.Sprintf("  🔄 Retrying step %d with default model `%s`...", step.StepIndex, defaultModelName))
-			output, err = s.executeChainStep(ctx, defaultModelName, fullPrompt, defaultModelName)
-			if err != nil {
-				progressFn(fmt.Sprintf("  ❌ Fallback also failed: %s", err.Error()))
+			// Fallback to default model for this step
+			output, execErr = s.executeChainStep(ctx, defaultModelName, fullPrompt, defaultModelName)
+			if execErr != nil {
+				progressFn(fmt.Sprintf("  └─ ❌ Fallback also failed: %s", execErr.Error()))
 				continue
 			}
 			step.ModelName = defaultModelName + " (fallback)"
@@ -274,30 +309,41 @@ func (s *Server) ExecuteChainPipeline(
 		step.OutputSize = len(output)
 		previousOutput = output
 
-		progressFn(fmt.Sprintf("  ✅ Step %d **done** — `%s` produced %d chars (%.1fs)",
-			step.StepIndex, step.ModelName, step.OutputSize, float64(step.DurationMs)/1000))
+		progressFn(fmt.Sprintf(
+			"  │ Status: ✅ done in %.1fs, output %d chars\n"+
+				"  └───────────────────────────────────────",
+			float64(step.DurationMs)/1000, step.OutputSize))
 
-		// Unload non-default model after use to free memory
-		if step.ModelName != defaultModelName && !strings.HasSuffix(step.ModelName, "(fallback)") {
-			s.unloadChainModel(step.ModelName)
-			progressFn(fmt.Sprintf("  🔻 Unloaded `%s` to free memory", step.ModelName))
+		// Unload the specialist model after use (skip default model / fallback)
+		rawModel := step.ModelName
+		if !strings.HasSuffix(rawModel, "(fallback)") && rawModel != defaultModelName {
+			progressFn(fmt.Sprintf("  🔻 Unloading `%s` to free memory...", rawModel))
+			s.unloadChainModelAndWait(rawModel)
+			progressFn("  ✓ Unloaded.")
 		}
 	}
 
 	pipeline.TotalDurationMs = time.Since(startTime).Milliseconds()
 
-	// ── Step 3: Synthesize — Build aggregated result ──
+	// ─── PHASE 4: Synthesize ──────────────────────────────────────────────────
 	pipeline.Status = "synthesizing"
-	progressFn(fmt.Sprintf("\n🧩 **Synthesizing Results** (total pipeline time: %.1fs)\n", float64(pipeline.TotalDurationMs)/1000))
+	progressFn(fmt.Sprintf(
+		"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"+
+			"🧩 Pipeline complete in %.1fs — reloading `%s` for final answer...\n"+
+			"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+		float64(pipeline.TotalDurationMs)/1000, defaultModelName))
 
-	// Build the final aggregated context for the default model
+	// Build the aggregated result returned to the default model as tool output
 	var synthesis strings.Builder
 	synthesis.WriteString("## Chain Pipeline Results\n\n")
-	synthesis.WriteString(fmt.Sprintf("**Pipeline ID:** %s\n", pipeline.ID))
-	synthesis.WriteString(fmt.Sprintf("**Original Request Analysis:** %s\n\n", chainReq.Reason))
+	synthesis.WriteString(fmt.Sprintf("**Pipeline ID:** %s  |  **Total time:** %.1fs\n",
+		pipeline.ID, float64(pipeline.TotalDurationMs)/1000))
+	synthesis.WriteString(fmt.Sprintf("**Reason:** %s\n\n", chainReq.Reason))
 
 	for _, step := range pipeline.Steps {
-		synthesis.WriteString(fmt.Sprintf("### Step %d — Model: `%s` (%.1fs)\n", step.StepIndex, step.ModelName, float64(step.DurationMs)/1000))
+		synthesis.WriteString(fmt.Sprintf(
+			"### Step %d — `%s` (%.1fs)\n",
+			step.StepIndex, step.ModelName, float64(step.DurationMs)/1000))
 		if step.Status == "done" && step.Output != "" {
 			synthesis.WriteString(step.Output)
 			synthesis.WriteString("\n\n")
@@ -317,8 +363,6 @@ func (s *Server) ExecuteChainPipeline(
 		"total_duration_ms", pipeline.TotalDurationMs,
 		"result_size", len(pipeline.FinalResult),
 	)
-
-	progressFn("✅ **Pipeline Complete** — Results returned to default model for final answer.\n")
 
 	return pipeline.FinalResult, nil
 }
@@ -493,17 +537,47 @@ func (s *Server) executeChainStep(ctx context.Context, modelName string, prompt 
 }
 
 // unloadChainModel triggers unloading of a model after a chain step to free memory.
+// This is the fire-and-forget variant; prefer unloadChainModelAndWait for the pipeline.
 func (s *Server) unloadChainModel(modelName string) {
-	mName := model.ParseName(modelName)
+	s.unloadChainModelAndWait(modelName)
+}
+
+// unloadChainModelAndWait expires the runner for modelName and then polls until
+// it is actually removed from the scheduler's loaded map (or times out after 30s).
+// This ensures the VRAM is freed before the next specialist model loads.
+func (s *Server) unloadChainModelAndWait(modelName string) {
+	// Strip "(fallback)" suffix if present
+	cleanName := strings.TrimSuffix(strings.TrimSpace(modelName), " (fallback)")
+
+	mName := model.ParseName(cleanName)
 	mName, err := getExistingName(mName)
 	if err != nil {
+		slog.Warn("chain: model not found for unload", "model", cleanName)
 		return
 	}
 	m, err := GetModel(mName.String())
 	if err != nil {
+		slog.Warn("chain: GetModel failed for unload", "model", cleanName, "error", err)
 		return
 	}
+
+	// Signal the scheduler to expire this runner immediately
 	s.sched.expireRunner(m)
+
+	// Poll until the runner is gone from the loaded map (max 30s)
+	deadline := time.Now().Add(30 * time.Second)
+	modelKey := schedulerModelKey(m)
+	for time.Now().Before(deadline) {
+		s.sched.loadedMu.Lock()
+		_, stillLoaded := s.sched.loaded[modelKey]
+		s.sched.loadedMu.Unlock()
+		if !stillLoaded {
+			slog.Info("chain: model unloaded", "model", cleanName)
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	slog.Warn("chain: timed out waiting for model to unload", "model", cleanName)
 }
 
 // parseChainRequest parses the raw tool call arguments into a ChainRequest.
