@@ -47,7 +47,7 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DEFAULT_HOST  = "http://localhost:11434"
-DEFAULT_MODEL = ""
+DEFAULT_MODEL = " "
 CHAT_ENDPOINT = "/api/chat"
 MEMORY_NOTE   = "(Memory context injected automatically by the server)"
 
