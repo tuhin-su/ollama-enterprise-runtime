@@ -162,6 +162,7 @@ func (s *Server) ExecuteChainPipeline(
 	toolCall api.ToolCall,
 	defaultModelName string,
 	progressFn func(msg string),
+	images []api.ImageData,
 ) (string, error) {
 
 	args := toolCall.Function.Arguments.ToMap()
@@ -276,7 +277,7 @@ func (s *Server) ExecuteChainPipeline(
 			step.StepIndex, len(pipeline.Steps),
 			step.ModelName, chainReq.SubTasks[i].Description, step.InputSize))
 
-		output, execErr := s.executeChainStep(ctx, step.ModelName, fullPrompt, defaultModelName)
+		output, execErr := s.executeChainStep(ctx, step.ModelName, fullPrompt, defaultModelName, images)
 		step.DurationMs = time.Since(stepStart).Milliseconds()
 
 		if execErr != nil {
@@ -294,7 +295,7 @@ func (s *Server) ExecuteChainPipeline(
 				execErr.Error(), defaultModelName))
 
 			// Fallback to default model for this step
-			output, execErr = s.executeChainStep(ctx, defaultModelName, fullPrompt, defaultModelName)
+			output, execErr = s.executeChainStep(ctx, defaultModelName, fullPrompt, defaultModelName, images)
 			if execErr != nil {
 				progressFn(fmt.Sprintf("  └─ ❌ Fallback also failed: %s", execErr.Error()))
 				continue
@@ -482,7 +483,7 @@ func (s *Server) selectModelForTask(task ChainSubTask, available []modelCapInfo,
 
 // executeChainStep runs a single inference step against a specific model
 // using the scheduler internally, similar to how the chat handler works.
-func (s *Server) executeChainStep(ctx context.Context, modelName string, prompt string, defaultModelName string) (string, error) {
+func (s *Server) executeChainStep(ctx context.Context, modelName string, prompt string, defaultModelName string, images []api.ImageData) (string, error) {
 	// Resolve the model
 	mName := model.ParseName(modelName)
 	mName, err := getExistingName(mName)
@@ -504,7 +505,7 @@ func (s *Server) executeChainStep(ctx context.Context, modelName string, prompt 
 	// Build messages for this step
 	msgs := []api.Message{
 		{Role: "system", Content: "You are a specialist model in a processing pipeline. Answer the following task precisely and concisely. Your output will be used as input for the next processing step or as part of a final aggregated answer."},
-		{Role: "user", Content: prompt},
+		{Role: "user", Content: prompt, Images: images},
 	}
 
 	if m.System != "" {
@@ -513,7 +514,7 @@ func (s *Server) executeChainStep(ctx context.Context, modelName string, prompt 
 
 	// Build the prompt from template
 	promptOpts := optionsForPrompt(opts, r)
-	templatePrompt, _, err := chatPrompt(ctx, m, r.Tokenize, promptOpts, msgs, nil, nil, true)
+	templatePrompt, mediaData, err := chatPrompt(ctx, m, r.Tokenize, promptOpts, msgs, nil, nil, true)
 	if err != nil {
 		return "", fmt.Errorf("failed to build prompt for '%s': %w", modelName, err)
 	}
@@ -522,6 +523,7 @@ func (s *Server) executeChainStep(ctx context.Context, modelName string, prompt 
 	var output strings.Builder
 	completionErr := r.Completion(ctx, llm.CompletionRequest{
 		Prompt:   templatePrompt,
+		Media:    mediaData,
 		Options:  opts,
 		Shift:    true,
 		Truncate: true,
@@ -653,6 +655,7 @@ func (s *Server) ExecuteChainPipelineStreaming(
 	toolCall api.ToolCall,
 	defaultModelName string,
 	streamProgress func(msg string),
+	images []api.ImageData,
 ) (string, error) {
-	return s.ExecuteChainPipeline(ctx, toolCall, defaultModelName, streamProgress)
+	return s.ExecuteChainPipeline(ctx, toolCall, defaultModelName, streamProgress, images)
 }

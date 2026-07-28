@@ -793,7 +793,7 @@ func (s *Server) ExecuteMemoryTool(ctx context.Context, userID string, toolCall 
 			slog.Info("chain pipeline progress", "message", msg)
 		}
 
-		result, err := s.ExecuteChainPipeline(ctx, toolCall, defaultModel, progressFn)
+		result, err := s.ExecuteChainPipeline(ctx, toolCall, defaultModel, progressFn, nil)
 		if err != nil {
 			return "", fmt.Errorf("chain pipeline failed: %w", err)
 		}

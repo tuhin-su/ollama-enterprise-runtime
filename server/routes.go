@@ -2621,36 +2621,49 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	}
 
 	if countChatImages(req.Messages) > 0 && len(m.ProjectorPaths) == 0 {
-		oldModel := req.Model
-		var foundVision bool
-		models, errList := s.modelCaches.modelList.List(c.Request.Context())
-		if errList == nil && len(models) > 0 {
-			for _, mod := range models {
-				if mod.Name != oldModel {
-					fallbackName := model.ParseName(mod.Name)
-					fallbackName, errName := getExistingName(fallbackName)
-					if errName == nil {
-						if mFallback, errGet := GetModel(fallbackName.String()); errGet == nil {
-							if len(mFallback.ProjectorPaths) > 0 {
-								m = mFallback
-								req.Model = mod.Name
-								name = fallbackName
-								modelRef, _ = parseAndValidateModelRef(req.Model)
-								if fallbackReason != "" {
-									fallbackReason += " "
-								}
-								fallbackReason += fmt.Sprintf("Model '%s' does not support image input. Falling back to vision model '%s'.", oldModel, req.Model)
-								foundVision = true
-								break
-							}
-						}
-					}
-				}
+		// Instead of crashing or doing automatic pipeline, inject a system note
+		// telling the model to use the chain_request tool with vision capabilities.
+		for i := range req.Messages {
+			if len(req.Messages[i].Images) > 0 {
+				req.Messages[i].Images = nil // Strip it so llama.cpp doesn't crash
 			}
 		}
-		if !foundVision {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("model '%s' does not support image input and no vision models were found", req.Model)})
-			return
+		
+		// Inject instruction to the model
+		sysNote := api.Message{
+			Role: "system",
+			Content: "[System: The user attached an image, but your current model architecture does not support direct image input. To process this image, you MUST use the 'chain_request' tool to delegate a subtask to a 'vision' model. The image is stored in context and will be automatically forwarded to the vision model during tool execution. Formulate a prompt for the vision model to extract whatever information you need to answer the user's query.]",
+		}
+		
+		// Prepend to messages or insert after the last system message
+		var newMsgs []api.Message
+		inserted := false
+		for _, msg := range req.Messages {
+			if msg.Role != "system" && !inserted {
+				newMsgs = append(newMsgs, sysNote)
+				inserted = true
+			}
+			newMsgs = append(newMsgs, msg)
+		}
+		if !inserted {
+			newMsgs = append(newMsgs, sysNote)
+		}
+		req.Messages = newMsgs
+		
+		// Ensure tools are enabled (injecting chain_request happens in memory_tools.go, but we must make sure tools are passed)
+		if len(req.Tools) == 0 {
+			req.Tools = GetChainTools()
+		} else {
+			hasChainTool := false
+			for _, t := range req.Tools {
+				if t.Function.Name == "chain_request" {
+					hasChainTool = true
+					break
+				}
+			}
+			if !hasChainTool {
+				req.Tools = append(req.Tools, GetChainTools()[0])
+			}
 		}
 	}
 
@@ -3211,7 +3224,13 @@ func (s *Server) ChatHandler(c *gin.Context) {
 						if defaultModelForChain == "" {
 							defaultModelForChain = req.Model
 						}
-						resultStr, execErr = s.ExecuteChainPipelineStreaming(c.Request.Context(), tc, defaultModelForChain, streamProgress)
+						var images []api.ImageData
+						for _, msg := range msgs {
+							if len(msg.Images) > 0 {
+								images = append(images, msg.Images...)
+							}
+						}
+						resultStr, execErr = s.ExecuteChainPipelineStreaming(c.Request.Context(), tc, defaultModelForChain, streamProgress, images)
 					} else {
 						resultStr, execErr = s.ExecuteMemoryTool(c.Request.Context(), memUID, tc)
 					}
@@ -3438,7 +3457,13 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 						if defaultModelForChain == "" {
 							defaultModelForChain = req.Model
 						}
-						resultStr, execErr = s.ExecuteChainPipelineStreaming(c.Request.Context(), tc, defaultModelForChain, streamProgress)
+						var images []api.ImageData
+						for _, msg := range msgs {
+							if len(msg.Images) > 0 {
+								images = append(images, msg.Images...)
+							}
+						}
+						resultStr, execErr = s.ExecuteChainPipelineStreaming(c.Request.Context(), tc, defaultModelForChain, streamProgress, images)
 					} else {
 						resultStr, execErr = s.ExecuteMemoryTool(c.Request.Context(), memUID, tc)
 					}
