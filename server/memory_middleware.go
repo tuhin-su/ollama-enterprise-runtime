@@ -83,10 +83,8 @@ func injectMemoryIntoMessages(ctx context.Context, s *Server, userID string, req
 
 	cfg := memory.LoadConfig()
 
-	// Inject memory tools when the model supports tool calls
-	if hasTools {
-		req.Tools = append(req.Tools, GetMemoryTools(ctx, s)...)
-	}
+	// Built-in memory tools are now handled by ToolManager!
+	// We no longer inject them here.
 
 	// Derive the current system prompt from the message list
 	var systemPrompt string
@@ -102,10 +100,8 @@ func injectMemoryIntoMessages(ctx context.Context, s *Server, userID string, req
 	// Build enriched system prompt
 	enrichedSystem := systemPrompt
 
-	// Append chain instructions when chain is enabled and model has tools
-	if hasTools && cfg.ChainEnabled {
-		enrichedSystem = strings.TrimRight(enrichedSystem, "\n") + chainSystemInstructions
-	}
+	// (Chain instructions are no longer appended here. 
+	// They should be fetched dynamically if the model requests the chain tool.)
 
 	// Retrieve relevant memories and append them
 	memReq := &memory.MemoryRequest{

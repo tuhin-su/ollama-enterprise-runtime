@@ -23,7 +23,7 @@ var globalToolManager *ToolManager
 
 // InitToolManager initializes the volatile LanceDB vector database for tools.
 // It explicitly wipes the directory to ensure no stale disconnected tools remain.
-func InitToolManager(ctx context.Context) error {
+func InitToolManager(ctx context.Context, s *Server) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -45,7 +45,28 @@ func InitToolManager(ctx context.Context) error {
 	}
 
 	slog.Info("ToolManager initialized with volatile vector DB", "path", dbDir)
+
+	// Register built-in tools (Memory & Chain) dynamically instead of bloating context
+	globalToolManager.RegisterBuiltinTools(ctx, s)
+
 	return nil
+}
+
+func (tm *ToolManager) RegisterBuiltinTools(ctx context.Context, s *Server) {
+	if memoryEngine == nil {
+		return // Cannot generate embeddings without memory engine
+	}
+
+	var builtinTools []api.Tool
+	builtinTools = append(builtinTools, GetMemoryTools(ctx, s)...)
+	builtinTools = append(builtinTools, GetChainTools(ctx, s)...)
+
+	for _, tool := range builtinTools {
+		// Suppress logs for builtins so we don't spam startup
+		_ = tm.AddTool(ctx, tool.Function.Name, tool)
+	}
+	
+	slog.Info("ToolManager registered built-in tools natively", "count", len(builtinTools))
 }
 
 // AddTool embeds a tool's description and adds it to the vector index and store.

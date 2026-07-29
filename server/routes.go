@@ -2044,11 +2044,6 @@ func Serve(ln net.Listener) error {
 		return err
 	}
 
-	// Initialize the RAG ToolManager Database
-	if err := InitToolManager(context.Background()); err != nil {
-		slog.Warn("failed to initialize ToolManager", "error", err)
-	}
-
 	if useClient2 {
 		slog.Warn("OLLAMA_EXPERIMENT=client2 is no longer available. Please remove this environment.")
 	}
@@ -2069,6 +2064,11 @@ func Serve(ln net.Listener) error {
 	// Memory subsystem — reads ~/.ollama/server.json for config.
 	// No-op when memory.enabled is false (the default).
 	initMemoryEngine(ctx)
+
+	// Initialize the RAG ToolManager Database (must be after memory engine)
+	if err := InitToolManager(ctx, s); err != nil {
+		slog.Warn("failed to initialize ToolManager", "error", err)
+	}
 
 	// Task scheduler — always enabled, persists jobs to ~/.ollama/scheduler.json.
 	initTaskScheduler(ctx, s)
@@ -2550,6 +2550,26 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		if err == nil {
 			req.Tools = append(req.Tools, searchTool)
 			slog.Info("Injected toolmanager.search meta-tool into ChatRequest", "active_tools_count", len(activeTools))
+			
+			// Inject system instruction so the model knows WHY and HOW to use the search tool
+			sysNote := api.Message{
+				Role: "system",
+				Content: "[System: You do not have all tools loaded in your context window. If you need to perform an action (like checking memory, scheduling tasks, chaining models, or using external scripts), use the 'toolmanager.search' tool to dynamically retrieve the tool you need from the database.]",
+			}
+			
+			var newMsgs []api.Message
+			inserted := false
+			for _, msg := range req.Messages {
+				if msg.Role != "system" && !inserted {
+					newMsgs = append(newMsgs, sysNote)
+					inserted = true
+				}
+				newMsgs = append(newMsgs, msg)
+			}
+			if !inserted {
+				newMsgs = append(newMsgs, sysNote)
+			}
+			req.Messages = newMsgs
 		}
 	}
 
@@ -2685,21 +2705,8 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		}
 		req.Messages = newMsgs
 		
-		// Ensure tools are enabled (injecting chain_request happens in memory_tools.go, but we must make sure tools are passed)
-		if len(req.Tools) == 0 {
-			req.Tools = GetChainTools(c.Request.Context(), s)
-		} else {
-			hasChainTool := false
-			for _, t := range req.Tools {
-				if t.Function.Name == "chain_request" {
-					hasChainTool = true
-					break
-				}
-			}
-			if !hasChainTool {
-				req.Tools = append(req.Tools, GetChainTools(c.Request.Context(), s)[0])
-			}
-		}
+		// Built-in chain tools are now handled by ToolManager!
+		// We no longer blindly inject them into the prompt.
 	}
 
 	if req.TopLogprobs < 0 || req.TopLogprobs > 20 {
