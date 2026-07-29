@@ -2056,7 +2056,6 @@ type runOptions struct {
 	Think          *api.ThinkValue
 	HideThinking   bool
 	ShowConnect    bool
-	NoHistory      bool // if true, messages are cleared after each turn (server handles memory)
 }
 
 func (r runOptions) Copy() runOptions {
@@ -2609,7 +2608,6 @@ func runInteractiveTUI(cmd *cobra.Command) {
 		WordWrap:    os.Getenv("TERM") == "xterm-256color",
 		Options:     map[string]any{},
 		ShowConnect: false,
-		NoHistory:   true,
 	}
 
 	if err := generateInteractive(cmd, opts); err != nil {

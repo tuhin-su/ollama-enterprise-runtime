@@ -582,15 +582,12 @@ func generateInteractive(cmd *cobra.Command, opts runOptions) error {
 					sb.Reset()
 					continue
 				}
-				return err
+				fmt.Printf("error: %v\n", err)
+				sb.Reset()
+				continue
 			}
 			if assistant != nil {
 				opts.Messages = append(opts.Messages, *assistant)
-			}
-
-			// If NoHistory mode is on, the server handles memory — don't accumulate messages client-side.
-			if opts.NoHistory {
-				opts.Messages = nil
 			}
 
 			sb.Reset()
