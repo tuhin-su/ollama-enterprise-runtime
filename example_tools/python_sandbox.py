@@ -25,9 +25,13 @@ tool_schema = {
                 "code": {
                     "type": "string",
                     "description": "The exact Python code to run. Output should be printed to stdout."
+                },
+                "user_confirmed": {
+                    "type": "boolean",
+                    "description": "Must be set to true only if the user explicitly requested or confirmed this Python execution in their message."
                 }
             },
-            "required": ["code"]
+            "required": ["code", "user_confirmed"]
         }
     }
 }

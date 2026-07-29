@@ -168,8 +168,13 @@ func GetMemoryTools(ctx context.Context, s *Server) api.Tools {
 							Type:        api.PropertyType{"integer"},
 							Description: "Optional ending line number to read (1-indexed, inclusive).",
 						})
+						m.Set("user_confirmed", api.ToolProperty{
+							Type:        api.PropertyType{"boolean"},
+							Description: "Must be set to true only if the user explicitly requested or confirmed this logs inspection in their message.",
+						})
 						return m
 					}(),
+					Required: []string{"user_confirmed"},
 				},
 			},
 		},
@@ -189,7 +194,16 @@ func GetMemoryTools(ctx context.Context, s *Server) api.Tools {
 				Name:        "restart_server",
 				Description: "Perform a graceful self-restart of the Ollama server process.",
 				Parameters: api.ToolFunctionParameters{
-					Type: "object",
+					Type:       "object",
+					Properties: func() *api.ToolPropertiesMap {
+						m := api.NewToolPropertiesMap()
+						m.Set("user_confirmed", api.ToolProperty{
+							Type:        api.PropertyType{"boolean"},
+							Description: "Must be set to true only if the user explicitly requested or confirmed this server restart in their message.",
+						})
+						return m
+					}(),
+					Required: []string{"user_confirmed"},
 				},
 			},
 		},
@@ -211,8 +225,13 @@ func GetMemoryTools(ctx context.Context, s *Server) api.Tools {
 							Type:        api.PropertyType{"string"},
 							Description: "The name of the model to load or unload (required for load_model/unload_model actions).",
 						})
+						m.Set("user_confirmed", api.ToolProperty{
+							Type:        api.PropertyType{"boolean"},
+							Description: "Must be set to true only if the user explicitly requested or confirmed this system tool execution in their message.",
+						})
 						return m
 					}(),
+					Required: []string{"action", "user_confirmed"},
 				},
 			},
 		},
