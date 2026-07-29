@@ -16,8 +16,7 @@ import (
 	"github.com/ollama/ollama/server/memory"
 )
 
-// GetMemoryTools returns the list of memory-related tools.
-func GetMemoryTools() api.Tools {
+func GetMemoryTools(ctx context.Context, s *Server) api.Tools {
 	// save_memory properties
 	saveProps := api.NewToolPropertiesMap()
 	saveProps.Set("content", api.ToolProperty{
@@ -220,7 +219,7 @@ func GetMemoryTools() api.Tools {
 	}
 
 	// Append chain pipeline tools
-	memTools = append(memTools, GetChainTools()...)
+	memTools = append(memTools, GetChainTools(ctx, s)...)
 
 	// Append task scheduler tools
 	memTools = append(memTools, GetSchedulerTools()...)

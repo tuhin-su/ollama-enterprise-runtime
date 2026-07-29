@@ -241,10 +241,20 @@ func CreateHandler(cmd *cobra.Command, args []string) error {
 			return errors.New("remote safetensor model creation not yet supported")
 		}
 
-		// Get Modelfile content - either from -f flag or default to "FROM ."
+		// Get Modelfile content - either from --import, -f flag, or default to "FROM ."
 		var reader io.Reader
+		importPath, _ := cmd.Flags().GetString("import")
+		description, _ := cmd.Flags().GetString("description")
 		filename, err := getModelfileName(cmd)
-		if os.IsNotExist(err) || filename == "" {
+
+		if importPath != "" {
+			modelfileContent := fmt.Sprintf("FROM %s\n", importPath)
+			if description != "" {
+				// Note: Requires backend parser support for DESCRIPTION
+				modelfileContent += fmt.Sprintf("DESCRIPTION %q\n", description)
+			}
+			reader = strings.NewReader(modelfileContent)
+		} else if os.IsNotExist(err) || filename == "" {
 			// No Modelfile specified or found - use default
 			reader = strings.NewReader("FROM .\n")
 		} else if err != nil {
@@ -1600,12 +1610,12 @@ func ListHandler(cmd *cobra.Command, args []string) error {
 				size = format.HumanBytes(m.Size)
 			}
 
-			data = append(data, []string{m.Name, m.Digest[:12], size, format.HumanTime(m.ModifiedAt, "Never")})
+			data = append(data, []string{m.Name, m.Digest[:12], size, format.HumanTime(m.ModifiedAt, "Never"), m.Description})
 		}
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"NAME", "ID", "SIZE", "MODIFIED"})
+	table.SetHeader([]string{"NAME", "ID", "SIZE", "MODIFIED", "DESCRIPTION"})
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.SetHeaderLine(false)
@@ -2803,6 +2813,8 @@ func NewCLI() *cobra.Command {
 	createCmd.Flags().StringP("quantize", "q", "", "Quantize model to this level (e.g. q4_K_M)")
 	createCmd.Flags().String("draft-quantize", "", "Quantize draft model to this level")
 	createCmd.Flags().Bool("experimental", false, "Enable experimental safetensors model creation")
+	createCmd.Flags().String("import", "", "Directly import a model from a file path")
+	createCmd.Flags().String("description", "", "Set the description for the imported model")
 
 	memoryCmd := &cobra.Command{
 		Use:   "memory",

@@ -47,7 +47,7 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DEFAULT_HOST  = "http://localhost:11434"
-DEFAULT_MODEL = " "
+DEFAULT_MODEL = ""
 CHAT_ENDPOINT = "/api/chat"
 MEMORY_NOTE   = "(Memory context injected automatically by the server)"
 
@@ -86,7 +86,7 @@ class OllamaClient:
             payload["messages"] = [{"role": "system", "content": system}] + messages
 
         url = self.host + CHAT_ENDPOINT
-        with self.session.post(url, json=payload, stream=True, timeout=120) as resp:
+        with self.session.post(url, json=payload, stream=True, timeout=None) as resp:
             resp.raise_for_status()
             for line in resp.iter_lines():
                 if not line:
@@ -125,7 +125,7 @@ class OllamaClient:
             payload["messages"] = [{"role": "system", "content": system}] + messages
 
         url  = self.host + CHAT_ENDPOINT
-        resp = self.session.post(url, json=payload, timeout=120)
+        resp = self.session.post(url, json=payload, timeout=None)
         resp.raise_for_status()
         data = resp.json()
 

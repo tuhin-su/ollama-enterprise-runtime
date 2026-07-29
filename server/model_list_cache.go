@@ -35,6 +35,7 @@ type modelListSummary struct {
 	ModifiedAt   time.Time
 	Details      api.ModelDetails
 	Capabilities []model.Capability
+	Description  string
 }
 
 type modelListCacheEntry struct {
@@ -327,6 +328,7 @@ func buildModelListSummary(name model.Name, mf *manifest.Manifest) (modelListSum
 		Size:        mf.Size(),
 		Digest:      mf.Digest(),
 		ModifiedAt:  modified,
+		Description: cfg.Description,
 		Details: api.ModelDetails{
 			Format:            cfg.ModelFormat,
 			Family:            cfg.ModelFamily,
@@ -832,6 +834,7 @@ func (s modelListSummary) ListModelResponse() api.ListModelResponse {
 		Size:        s.Size,
 		Digest:      s.Digest,
 		ModifiedAt:  s.ModifiedAt,
+		Description: s.Description,
 		Details: api.ModelDetails{
 			ParentModel:       s.Details.ParentModel,
 			Format:            s.Details.Format,

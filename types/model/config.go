@@ -10,6 +10,7 @@ type ConfigV2 struct {
 	Renderer      string   `json:"renderer,omitempty"`
 	Parser        string   `json:"parser,omitempty"`
 	Requires      string   `json:"requires,omitempty"`
+	Description   string   `json:"description,omitempty"`
 
 	RemoteHost  string `json:"remote_host,omitempty"`
 	RemoteModel string `json:"remote_model,omitempty"`

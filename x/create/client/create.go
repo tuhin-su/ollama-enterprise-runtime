@@ -38,10 +38,11 @@ type ModelfileConfig struct {
 	System     string
 	License    string
 	Draft      string
-	Parser     string
-	Renderer   string
-	Requires   string
-	Parameters map[string]any
+	Parser      string
+	Renderer    string
+	Requires    string
+	Description string
+	Parameters  map[string]any
 }
 
 var ignoredModelfileParameters = []string{
@@ -91,6 +92,8 @@ func ConfigFromModelfile(modelfile *parser.Modelfile) (string, *ModelfileConfig,
 				return "", nil, fmt.Errorf("requires %s is below the minimum supported version %s for safetensors models", strings.TrimPrefix(requires, "v"), MinOllamaVersion)
 			}
 			mfConfig.Requires = strings.TrimPrefix(requires, "v")
+		case "description":
+			mfConfig.Description = cmd.Args
 		case "adapter", "message":
 			continue
 		default:

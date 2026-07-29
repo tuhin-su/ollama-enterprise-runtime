@@ -69,6 +69,7 @@ func (s *Server) CreateHandler(c *gin.Context) {
 	config.Renderer = r.Renderer
 	config.Parser = r.Parser
 	config.Requires = r.Requires
+	config.Description = r.Description
 
 	for v, digest := range r.Files {
 		if !fs.ValidPath(v) {

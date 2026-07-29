@@ -76,7 +76,7 @@ Examples of when to use schedule_task:
 //
 // Returns the (possibly modified) message slice. Always safe — never panics
 // and never blocks inference if the memory engine is down.
-func injectMemoryIntoMessages(ctx context.Context, userID string, req *api.ChatRequest, msgs []api.Message, hasTools bool) []api.Message {
+func injectMemoryIntoMessages(ctx context.Context, s *Server, userID string, req *api.ChatRequest, msgs []api.Message, hasTools bool) []api.Message {
 	if memoryEngine == nil || userID == "" {
 		return msgs
 	}
@@ -85,7 +85,7 @@ func injectMemoryIntoMessages(ctx context.Context, userID string, req *api.ChatR
 
 	// Inject memory tools when the model supports tool calls
 	if hasTools {
-		req.Tools = append(req.Tools, GetMemoryTools()...)
+		req.Tools = append(req.Tools, GetMemoryTools(ctx, s)...)
 	}
 
 	// Derive the current system prompt from the message list

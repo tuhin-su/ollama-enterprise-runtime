@@ -146,6 +146,8 @@ func (f Modelfile) CreateRequest(relativeDir string) (*api.CreateRequest, error)
 		case "message":
 			role, msg, _ := strings.Cut(c.Args, ": ")
 			messages = append(messages, api.Message{Role: role, Content: msg})
+		case "description":
+			req.Description = c.Args
 		default:
 			if slices.Contains(deprecatedParameters, c.Name) {
 				fmt.Printf("warning: parameter %s is deprecated\n", c.Name)
@@ -410,7 +412,7 @@ func (c Command) String() string {
 	switch c.Name {
 	case "model":
 		fmt.Fprintf(&sb, "FROM %s", c.Args)
-	case "license", "template", "system", "adapter", "renderer", "parser", "requires", "draft":
+	case "license", "template", "system", "adapter", "renderer", "parser", "requires", "draft", "description":
 		fmt.Fprintf(&sb, "%s %s", strings.ToUpper(c.Name), quote(c.Args))
 	case "message":
 		role, message, _ := strings.Cut(c.Args, ": ")
@@ -436,7 +438,7 @@ const (
 var (
 	errMissingFrom        = errors.New("no FROM line")
 	errInvalidMessageRole = errors.New("message role must be one of \"system\", \"user\", or \"assistant\"")
-	errInvalidCommand     = errors.New("command must be one of \"from\", \"license\", \"template\", \"system\", \"adapter\", \"draft\", \"renderer\", \"parser\", \"parameter\", \"message\", or \"requires\"")
+	errInvalidCommand     = errors.New("command must be one of \"from\", \"license\", \"template\", \"system\", \"adapter\", \"draft\", \"renderer\", \"parser\", \"parameter\", \"message\", \"description\", or \"requires\"")
 )
 
 type ParserError struct {
@@ -696,7 +698,7 @@ func isValidMessageRole(role string) bool {
 
 func isValidCommand(cmd string) bool {
 	switch strings.ToLower(cmd) {
-	case "from", "license", "template", "system", "adapter", "draft", "renderer", "parser", "parameter", "message", "requires":
+	case "from", "license", "template", "system", "adapter", "draft", "renderer", "parser", "parameter", "message", "description", "requires":
 		return true
 	default:
 		return false

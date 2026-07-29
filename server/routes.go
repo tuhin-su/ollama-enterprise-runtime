@@ -261,7 +261,7 @@ func (s *Server) GenerateHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing request body"})
 		return
 	} else if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -803,7 +803,7 @@ func (s *Server) EmbedHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing request body"})
 		return
 	case err != nil:
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1041,7 +1041,7 @@ func (s *Server) EmbeddingsHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing request body"})
 		return
 	} else if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1097,7 +1097,7 @@ func (s *Server) PullHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing request body"})
 		return
 	case err != nil:
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1116,7 +1116,7 @@ func (s *Server) PullHandler(c *gin.Context) {
 
 	name, err = getExistingName(name)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1158,7 +1158,7 @@ func (s *Server) PushHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing request body"})
 		return
 	case err != nil:
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1240,7 +1240,7 @@ func (s *Server) DeleteHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing request body"})
 		return
 	} else if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1248,11 +1248,11 @@ func (s *Server) DeleteHandler(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, errConflictingModelSource):
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		case errors.Is(err, model.ErrUnqualifiedName):
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("name %q is invalid", cmp.Or(r.Model, r.Name))})
 		default:
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		}
 		return
 	}
@@ -1295,7 +1295,7 @@ func (s *Server) ShowHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing request body"})
 		return
 	case err != nil:
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1466,6 +1466,7 @@ func GetModelInfo(req api.ShowRequest) (*api.ShowResponse, error) {
 		Capabilities: m.Capabilities(),
 		ModifiedAt:   mf.FileInfo().ModTime(),
 		Requires:     m.Config.Requires,
+		Description:  m.Config.Description,
 		// Several integrations crash on a nil/omitempty+empty ModelInfo, so by
 		// default we return an empty map.
 		ModelInfo: make(map[string]any),
@@ -1646,7 +1647,7 @@ func (s *Server) CopyHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing request body"})
 		return
 	} else if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1657,7 +1658,7 @@ func (s *Server) CopyHandler(c *gin.Context) {
 	}
 	src, err := getExistingName(src)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1668,7 +1669,7 @@ func (s *Server) CopyHandler(c *gin.Context) {
 	}
 	dst, err = getExistingName(dst)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1684,7 +1685,7 @@ func (s *Server) CopyHandler(c *gin.Context) {
 func (s *Server) HeadBlobHandler(c *gin.Context) {
 	path, err := manifest.BlobsPath(c.Param("digest"))
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1718,7 +1719,7 @@ func (s *Server) CreateBlobHandler(c *gin.Context) {
 
 	path, err := manifest.BlobsPath(c.Param("digest"))
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1847,7 +1848,7 @@ func tokenAuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Allow unauthenticated health checks so load-balancers work.
-		if c.Request.URL.Path == "/" {
+		if c.Request.URL.Path == "/" || c.Request.URL.Path == "/api/tools/interface" {
 			c.Next()
 			return
 		}
@@ -1920,6 +1921,7 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 	r.HEAD("/api/version", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"version": version.Version}) })
 	r.GET("/api/version", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"version": version.Version}) })
 	r.GET("/api/status", s.StatusHandler)
+	r.GET("/api/tools/interface", s.ToolInterfaceHandler)
 
 	// Local model cache management (new implementation is at end of function)
 	r.POST("/api/pull", s.PullHandler)
@@ -2227,7 +2229,7 @@ func (s *Server) WebFetchExperimentalHandler(c *gin.Context) {
 func (s *Server) webExperimentalProxyHandler(c *gin.Context, proxyPath, disabledOperation string) {
 	body, err := readRequestBody(c.Request)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -2509,13 +2511,20 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing request body"})
 		return
 	} else if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	if req.TopLogprobs < 0 || req.TopLogprobs > 20 {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "top_logprobs must be between 0 and 20"})
 		return
+	}
+
+	// Dynamically inject any connected tools into the request context!
+	activeTools := globalToolServer.GetActiveTools()
+	if len(activeTools) > 0 {
+		req.Tools = append(req.Tools, activeTools...)
+		slog.Info("Injected connected tools into ChatRequest", "count", len(activeTools))
 	}
 
 	var fallbackReason string
@@ -2652,7 +2661,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		
 		// Ensure tools are enabled (injecting chain_request happens in memory_tools.go, but we must make sure tools are passed)
 		if len(req.Tools) == 0 {
-			req.Tools = GetChainTools()
+			req.Tools = GetChainTools(c.Request.Context(), s)
 		} else {
 			hasChainTool := false
 			for _, t := range req.Tools {
@@ -2662,7 +2671,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 				}
 			}
 			if !hasChainTool {
-				req.Tools = append(req.Tools, GetChainTools()[0])
+				req.Tools = append(req.Tools, GetChainTools(c.Request.Context(), s)[0])
 			}
 		}
 	}
@@ -2837,7 +2846,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	// --- Memory subsystem: enrich messages with long-term memory context ---
 	memUID := memoryUserID(&req, c.Request.RemoteAddr)
 	hasTools := slices.Contains(m.Capabilities(), model.CapabilityTools)
-	msgs = injectMemoryIntoMessages(c.Request.Context(), memUID, &req, msgs, hasTools)
+	msgs = injectMemoryIntoMessages(c.Request.Context(), s, memUID, &req, msgs, hasTools)
 	// -----------------------------------------------------------------------
 
 	if shouldUseHarmony(m) {
@@ -3786,19 +3795,20 @@ func (s *Server) AnthropicMessagesHandler(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Translate model name to the local model qwen2.5-vl-7b:latest
 	modelName := req.Model
 	if strings.Contains(strings.ToLower(modelName), "claude") || modelName == "" {
-		modelName = "qwen2.5-vl-7b:latest"
+		availableModels, _ := s.getAvailableModelsWithCaps(c.Request.Context())
+		task := ChainSubTask{RequiredCapability: "vision"}
+		modelName = s.selectModelForTask(task, availableModels, "")
 	}
 
 	modelRef, err := parseAndValidateModelRef(modelName)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fmt.Printf("\n\n\nCHAT_HANDLER_ERROR: %v\n\n\n", err); c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 

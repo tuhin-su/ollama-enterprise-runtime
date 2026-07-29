@@ -80,7 +80,7 @@ type ChainSubTask struct {
 }
 
 // GetChainTools returns the chain_request tool definition for injection into model tools.
-func GetChainTools() api.Tools {
+func GetChainTools(ctx context.Context, s *Server) api.Tools {
 	subTaskProps := api.NewToolPropertiesMap()
 	subTaskProps.Set("description", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
@@ -96,7 +96,7 @@ func GetChainTools() api.Tools {
 	})
 	subTaskProps.Set("preferred_model", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "Optional: specific model name to use (from list_models results).",
+		Description: "Optional: specific model name to use (from the available specialist models listed above).",
 	})
 	subTaskProps.Set("needs_previous_output", api.ToolProperty{
 		Type:        api.PropertyType{"boolean"},
@@ -123,12 +123,23 @@ func GetChainTools() api.Tools {
 		},
 	})
 
+	desc := "Delegate a complex request to a chain of specialist models when you cannot handle it alone. Analyze what capabilities are needed, break the work into subtasks, and the system will automatically select and orchestrate the best available models. Each step's output feeds into the next. The final aggregated result will be returned to you for synthesis."
+	
+	if s != nil && ctx != nil {
+		if models, err := s.getAvailableModelsWithCaps(ctx); err == nil && len(models) > 0 {
+			desc += "\n\nAvailable specialist models to delegate to (you can optionally specify these in 'preferred_model' based on their description):\n"
+			for _, m := range models {
+				desc += fmt.Sprintf("- %s: %s\n", m.Name, m.Description)
+			}
+		}
+	}
+
 	return api.Tools{
 		{
 			Type: "function",
 			Function: api.ToolFunction{
 				Name:        "chain_request",
-				Description: "Delegate a complex request to a chain of specialist models when you cannot handle it alone. Analyze what capabilities are needed, break the work into subtasks, and the system will automatically select and orchestrate the best available models. Each step's output feeds into the next. The final aggregated result will be returned to you for synthesis.",
+				Description: desc,
 				Parameters: api.ToolFunctionParameters{
 					Type:       "object",
 					Properties: chainProps,
@@ -226,7 +237,9 @@ func (s *Server) ExecuteChainPipeline(
 		cap := task.RequiredCapability
 		if cap == "" {
 			// Auto-detect if they forgot to set required_capability
-			if strings.Contains(strings.ToLower(task.Description), "image") || strings.Contains(strings.ToLower(task.Description), "vision") {
+			descLower := strings.ToLower(task.Description)
+			reasonLower := strings.ToLower(chainReq.Reason)
+			if strings.Contains(descLower, "image") || strings.Contains(descLower, "vision") || strings.Contains(reasonLower, "image") || strings.Contains(reasonLower, "vision") {
 				cap = "vision"
 				task.RequiredCapability = "vision"
 			} else {
@@ -393,6 +406,7 @@ type modelCapInfo struct {
 	Family       string
 	ParamSize    string
 	System       string
+	Description  string
 	Capabilities []model.Capability
 	HasTools     bool
 }
@@ -407,9 +421,10 @@ func (s *Server) getAvailableModelsWithCaps(ctx context.Context) ([]modelCapInfo
 	var result []modelCapInfo
 	for _, mInfo := range models {
 		info := modelCapInfo{
-			Name:      mInfo.Name,
-			Family:    mInfo.Details.Family,
-			ParamSize: mInfo.Details.ParameterSize,
+			Name:        mInfo.Name,
+			Family:      mInfo.Details.Family,
+			ParamSize:   mInfo.Details.ParameterSize,
+			Description: mInfo.Description,
 		}
 
 		if mObj, errObj := GetModel(mInfo.Name); errObj == nil {
@@ -425,14 +440,7 @@ func (s *Server) getAvailableModelsWithCaps(ctx context.Context) ([]modelCapInfo
 
 // selectModelForTask picks the best available model for a subtask.
 func (s *Server) selectModelForTask(task ChainSubTask, available []modelCapInfo, defaultModel string) string {
-	// If a preferred model was specified and it exists, use it
-	if task.PreferredModel != "" {
-		for _, m := range available {
-			if m.Name == task.PreferredModel {
-				return m.Name
-			}
-		}
-	}
+	// PreferredModel is ignored to enforce strict deterministic capability routing.
 
 	// Map the required_capability string to model.Capability
 	capMap := map[string]model.Capability{
@@ -466,7 +474,7 @@ func (s *Server) selectModelForTask(task ChainSubTask, available []modelCapInfo,
 		}
 	}
 
-	// Try matching by family or keyword in system prompt
+	// Try matching by family or keyword in system prompt or description
 	keyword := strings.ToLower(task.RequiredCapability)
 	if keyword == "" {
 		keyword = strings.ToLower(task.Description)
@@ -478,16 +486,24 @@ func (s *Server) selectModelForTask(task ChainSubTask, available []modelCapInfo,
 		nameLower := strings.ToLower(m.Name)
 		familyLower := strings.ToLower(m.Family)
 		systemLower := strings.ToLower(m.System)
+		descLower := strings.ToLower(m.Description)
 
 		if strings.Contains(nameLower, keyword) ||
 			strings.Contains(familyLower, keyword) ||
-			strings.Contains(systemLower, keyword) {
+			strings.Contains(systemLower, keyword) ||
+			strings.Contains(descLower, keyword) {
 			return m.Name
 		}
 
 		// Heuristic: code-related tasks match "code", "coder", "starcoder", "deepseek-coder" etc.
 		if (keyword == "code" || keyword == "coding") &&
 			(strings.Contains(nameLower, "code") || strings.Contains(nameLower, "coder") || strings.Contains(nameLower, "deepseek")) {
+			return m.Name
+		}
+
+		// Heuristic: vision-related tasks match "vl", "llava", "vision"
+		if (keyword == "vision" || keyword == "image") &&
+			(strings.Contains(nameLower, "vl") || strings.Contains(nameLower, "llava") || strings.Contains(nameLower, "vision")) {
 			return m.Name
 		}
 	}

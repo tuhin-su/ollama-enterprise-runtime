@@ -162,7 +162,7 @@ type ChatRequest struct {
 	KeepAlive *Duration `json:"keep_alive,omitempty"`
 
 	// Tools is an optional list of tools the model has access to.
-	Tools `json:"tools,omitempty"`
+	Tools []Tool `json:"tools,omitempty"`
 
 	// Options lists model-specific options.
 	Options map[string]any `json:"options"`
@@ -715,6 +715,9 @@ type CreateRequest struct {
 	// Requires is the minimum version of Ollama required by the model.
 	Requires string `json:"requires,omitempty"`
 
+	// Description is the description of what the model does.
+	Description string `json:"description,omitempty"`
+
 	// Info is a map of additional information for the model
 	Info map[string]any `json:"info,omitempty"`
 
@@ -765,6 +768,7 @@ type ShowResponse struct {
 	Tensors       []Tensor           `json:"tensors,omitempty"`
 	Capabilities  []model.Capability `json:"capabilities,omitempty"`
 	ModifiedAt    time.Time          `json:"modified_at,omitempty"`
+	Description   string             `json:"description,omitempty"`
 	Requires      string             `json:"requires,omitempty"`
 }
 
@@ -843,6 +847,7 @@ type ListModelResponse struct {
 	Digest       string             `json:"digest"`
 	Details      ModelDetails       `json:"details,omitempty"`
 	Capabilities []model.Capability `json:"capabilities,omitempty"`
+	Description  string             `json:"description,omitempty"`
 }
 
 // ProcessModelResponse is a single model description in [ProcessResponse].
