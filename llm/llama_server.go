@@ -2079,7 +2079,8 @@ func accumulatedToolCalls(accs map[int]*llamaServerToolCallAccumulator) ([]api.T
 		var args api.ToolCallFunctionArguments
 		if strings.TrimSpace(acc.arguments) != "" {
 			if err := json.Unmarshal([]byte(acc.arguments), &args); err != nil {
-				return nil, fmt.Errorf("llama-server returned invalid tool call arguments for %q: %w", acc.name, err)
+				slog.Warn("llama-server returned invalid tool call arguments, falling back to empty args", "tool", acc.name, "arguments", acc.arguments, "error", err)
+				args = api.NewToolCallFunctionArguments()
 			}
 		}
 
