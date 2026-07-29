@@ -2132,6 +2132,7 @@ type runOptions struct {
 	Think          *api.ThinkValue
 	HideThinking   bool
 	ShowConnect    bool
+	NoHistory      bool // if true, messages are cleared after each turn (server handles memory)
 }
 
 func (r runOptions) Copy() runOptions {
@@ -2671,7 +2672,7 @@ func launchInteractiveModel(cmd *cobra.Command, modelName string) error {
 	return nil
 }
 
-// runInteractiveTUI runs the main interactive TUI menu.
+// runInteractiveTUI runs the main interactive chat session inline.
 func runInteractiveTUI(cmd *cobra.Command) {
 	// Ensure the server is running via the shared checkServerHeartbeat path.
 	if err := checkServerHeartbeat(cmd, nil); err != nil {
@@ -2679,25 +2680,16 @@ func runInteractiveTUI(cmd *cobra.Command) {
 		return
 	}
 
-	accountPrefetch := launch.StartAccountStatePrefetch(cmd.Context())
-	deps := launcherDeps{
-		buildState:          launch.BuildLauncherState,
-		runMenu:             tui.RunMenu,
-		resolveRunModel:     launch.ResolveRunModel,
-		launchIntegration:   launch.LaunchIntegration,
-		runModel:            launchInteractiveModel,
-		accountState:        accountPrefetch.StateIfReady,
-		accountStateUpdates: accountPrefetch.StateUpdates,
+	opts := runOptions{
+		Model:       "",
+		WordWrap:    os.Getenv("TERM") == "xterm-256color",
+		Options:     map[string]any{},
+		ShowConnect: false,
+		NoHistory:   true,
 	}
 
-	for {
-		continueLoop, err := runInteractiveTUIStep(cmd, deps)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		}
-		if !continueLoop {
-			return
-		}
+	if err := generateInteractive(cmd, opts); err != nil {
+		fmt.Fprintf(os.Stderr, "Error running agent: %v\n", err)
 	}
 }
 

@@ -39,6 +39,7 @@ func generateInteractive(cmd *cobra.Command, opts runOptions) error {
 		fmt.Fprintln(os.Stderr, "  /load <model>   Load a session or model")
 		fmt.Fprintln(os.Stderr, "  /save <model>   Save your current session")
 		fmt.Fprintln(os.Stderr, "  /clear          Clear session context")
+		fmt.Fprintln(os.Stderr, "  /file <path>    Attach any file to next message (image, code, text, PDF, CSV, ...)")
 		fmt.Fprintln(os.Stderr, "  /bye            Exit")
 		fmt.Fprintln(os.Stderr, "  /?, /help       Help for a command")
 		fmt.Fprintln(os.Stderr, "  /? shortcuts    Help for keyboard shortcuts")
@@ -135,6 +136,7 @@ func generateInteractive(cmd *cobra.Command, opts runOptions) error {
 	var sb strings.Builder
 	var multiline MultilineState
 	var thinkExplicitlySet bool = opts.Think != nil
+	var pendingFileContent string // injected as text prefix on next user message
 
 	for {
 		line, err := scanner.Readline()
@@ -275,6 +277,47 @@ func generateInteractive(cmd *cobra.Command, opts runOptions) error {
 				return err
 			}
 			fmt.Printf("Created new model '%s'\n", args[1])
+			continue
+		case strings.HasPrefix(line, "/file"):
+			args := strings.Fields(line)
+			if len(args) < 2 {
+				fmt.Println("Usage:\n  /file <path/to/file>")
+				continue
+			}
+			filePath := strings.Join(args[1:], " ")
+			// Strip surrounding quotes if present
+			filePath = strings.Trim(filePath, "\"'")
+			filePath = filepath.Clean(filePath)
+
+			fileInfo, err := os.Stat(filePath)
+			if err != nil {
+				fmt.Printf("error: file not found: %s\n", filePath)
+				continue
+			}
+			if fileInfo.IsDir() {
+				fmt.Printf("error: '%s' is a directory, not a file\n", filePath)
+				continue
+			}
+
+			ext := strings.ToLower(filepath.Ext(filePath))
+			imageExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true, ".gif": true, ".bmp": true}
+
+			if imageExts[ext] && opts.MultiModal {
+				// Treat as a vision image — inject path into the builder for extractFileData
+				sb.WriteString(filePath)
+				fmt.Printf("Attached image: %s\n", filepath.Base(filePath))
+			} else {
+				// Read as raw text and stage it as a file-content prefix
+				contentBytes, err := os.ReadFile(filePath)
+				if err != nil {
+					fmt.Printf("error: could not read file: %v\n", err)
+					continue
+				}
+				// Detect language hint from extension for the fenced block
+				lang := strings.TrimPrefix(ext, ".")
+				pendingFileContent = fmt.Sprintf("File: %s\n```%s\n%s\n```\n\n", filepath.Base(filePath), lang, string(contentBytes))
+				fmt.Printf("Staged file: %s (%d bytes) — will be attached to your next message\n", filepath.Base(filePath), len(contentBytes))
+			}
 			continue
 		case strings.HasPrefix(line, "/clear"):
 			opts.Messages = []api.Message{}
@@ -524,6 +567,11 @@ func generateInteractive(cmd *cobra.Command, opts runOptions) error {
 				newMessage.Images = images
 			}
 
+			if pendingFileContent != "" {
+				newMessage.Content = pendingFileContent + newMessage.Content
+				pendingFileContent = ""
+			}
+
 			opts.Messages = append(opts.Messages, newMessage)
 
 			assistant, err := chat(cmd, opts)
@@ -538,6 +586,11 @@ func generateInteractive(cmd *cobra.Command, opts runOptions) error {
 			}
 			if assistant != nil {
 				opts.Messages = append(opts.Messages, *assistant)
+			}
+
+			// If NoHistory mode is on, the server handles memory — don't accumulate messages client-side.
+			if opts.NoHistory {
+				opts.Messages = nil
 			}
 
 			sb.Reset()
