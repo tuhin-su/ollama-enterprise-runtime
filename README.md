@@ -8,6 +8,18 @@
 
 Start building with open models.
 
+## Ollama vs This Fork (Agentic Ollama)
+
+While the original Ollama is a fantastic tool for running LLMs locally, it primarily acts as a dumb execution engine. **This fork transforms Ollama into a smart, autonomous, multi-model orchestrator.** 
+
+Key differences in this fork:
+- **Agentic Model Chaining:** A primary general-purpose model can dynamically delegate complex subtasks (vision, math, coding) to specialized models running locally.
+- **Dynamic Routing & Model Awareness:** Modelfiles support a native `DESCRIPTION` keyword. When models interact, the backend injects descriptions of all installed models into their context so they "know" what other specialized models are available to them.
+- **Anthropic Proxy Translation:** When connected to clients via the Anthropic (`/v1/messages`) compatibility layer, if an explicit model isn't requested (or "claude" is requested), the backend dynamically resolves the best local vision-capable model automatically.
+- **Automatic Tool Injection:** Core system management tools (like `chain_request` and `system_management`) are natively and transparently injected, allowing models to query system health, reboot themselves, or route subtasks without the client application needing to write any orchestration logic.
+
+See [docs/architecture.md](docs/architecture.md) for more details.
+
 ## Install
 
 ### Linux & macOS
@@ -105,6 +117,15 @@ ollama export my-model model.gguf
 # Export a VL model (projector is auto-exported as well)
 ollama export my-vl-model model.gguf
 ```
+
+## Agentic Orchestration & Capabilities
+
+Ollama supports **Model Chaining** and **Agentic Orchestration** locally:
+- **Automatic Tool Injection:** The `chain_request` tool is automatically injected into models. 
+- **Dynamic Routing:** Ollama can parse the `DESCRIPTION` keyword inside your `Modelfile` to give models a dynamic awareness of other models running locally on your hardware. 
+- **Subtask Delegation:** Generic models can intelligently offload specialized workloads (such as image analysis, coding, or math) to specific models based on their descriptions.
+
+See [docs/architecture.md](docs/architecture.md) for architecture details, and the [Tool & Client Developer Guide](docs/tool-developer-guide.md) for information on building apps and natively registering custom tools!
 
 ## REST API
 
