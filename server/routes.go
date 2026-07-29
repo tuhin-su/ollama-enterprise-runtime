@@ -2815,7 +2815,15 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		}
 	}
 
-	r, m, opts, err := s.scheduleRunner(c.Request.Context(), name.String(), caps, req.Options, req.KeepAlive, req.Shift)
+	runnerCtx, runnerCancel := context.WithCancel(c.Request.Context())
+	cancelWrapper := func() {
+		if runnerCancel != nil {
+			runnerCancel()
+		}
+	}
+	defer cancelWrapper()
+
+	r, m, opts, err := s.scheduleRunner(runnerCtx, name.String(), caps, req.Options, req.KeepAlive, req.Shift)
 	if errors.Is(err, errCapabilityCompletion) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%q does not support chat", req.Model)})
 		return
@@ -2862,7 +2870,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	}
 
 	if chatModeForModel(m) == chatExecutionModeNative {
-		s.handleNativeChat(c, req, m, r, opts, msgs, checkpointStart, checkpointLoaded, fallbackReason)
+		s.handleNativeChat(c, req, m, r, opts, msgs, checkpointStart, checkpointLoaded, fallbackReason, runnerCtx, runnerCancel, caps)
 		return
 	}
 
@@ -3239,7 +3247,20 @@ func (s *Server) ChatHandler(c *gin.Context) {
 								images = append(images, msg.Images...)
 							}
 						}
+						
+						// Release the default model's runner to free VRAM for the pipeline
+						if runnerCancel != nil {
+							runnerCancel()
+						}
+						
 						resultStr, execErr = s.ExecuteChainPipelineStreaming(c.Request.Context(), tc, defaultModelForChain, streamProgress, images)
+						
+						// Re-acquire the runner
+						runnerCtx, runnerCancel = context.WithCancel(c.Request.Context())
+						r, m, opts, err = s.scheduleRunner(runnerCtx, name.String(), caps, req.Options, req.KeepAlive, req.Shift)
+						if err != nil {
+							execErr = fmt.Errorf("failed to re-acquire model after chain: %w", err)
+						}
 					} else {
 						resultStr, execErr = s.ExecuteMemoryTool(c.Request.Context(), memUID, tc)
 					}
@@ -3310,7 +3331,7 @@ func prepareNativeChatRequest(ctx context.Context, m *Model, r llm.LlamaServer, 
 	return nativeReq, err
 }
 
-func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model, r llm.LlamaServer, opts *api.Options, msgs []api.Message, checkpointStart, checkpointLoaded time.Time, fallbackReason string) {
+func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model, r llm.LlamaServer, opts *api.Options, msgs []api.Message, checkpointStart, checkpointLoaded time.Time, fallbackReason string, runnerCtx context.Context, runnerCancel context.CancelFunc, caps []model.Capability) {
 	truncate := req.Truncate == nil || *req.Truncate
 	nativeReq, err := prepareNativeChatRequest(c.Request.Context(), m, r, opts, llm.ChatRequest{
 		Messages:    msgs,
@@ -3472,7 +3493,21 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 								images = append(images, msg.Images...)
 							}
 						}
+						
+						// Release the default model's runner to free VRAM for the pipeline
+						if runnerCancel != nil {
+							runnerCancel()
+						}
+						
 						resultStr, execErr = s.ExecuteChainPipelineStreaming(c.Request.Context(), tc, defaultModelForChain, streamProgress, images)
+						
+						// Re-acquire the runner
+						runnerCtx, runnerCancel = context.WithCancel(c.Request.Context())
+						var schedErr error
+						r, m, opts, schedErr = s.scheduleRunner(runnerCtx, req.Model, caps, req.Options, req.KeepAlive, nil)
+						if schedErr != nil {
+							execErr = fmt.Errorf("failed to re-acquire model after chain: %w", schedErr)
+						}
 					} else {
 						resultStr, execErr = s.ExecuteMemoryTool(c.Request.Context(), memUID, tc)
 					}

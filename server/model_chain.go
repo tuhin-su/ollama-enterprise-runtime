@@ -528,7 +528,10 @@ func (s *Server) executeChainStep(ctx context.Context, modelName string, prompt 
 	}
 
 	caps := []model.Capability{model.CapabilityCompletion}
-	r, m, opts, err := s.scheduleRunner(ctx, mName.String(), caps, nil, nil, nil)
+	runnerCtx, runnerCancel := context.WithCancel(ctx)
+	defer runnerCancel()
+
+	r, m, opts, err := s.scheduleRunner(runnerCtx, mName.String(), caps, nil, nil, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to schedule runner for '%s': %w", modelName, err)
 	}
@@ -565,6 +568,9 @@ func (s *Server) executeChainStep(ctx context.Context, modelName string, prompt 
 	if completionErr != nil {
 		return "", fmt.Errorf("completion failed for '%s': %w", modelName, completionErr)
 	}
+
+	// Release the runner explicitly before returning, so it can be unloaded cleanly
+	runnerCancel()
 
 	return output.String(), nil
 }
