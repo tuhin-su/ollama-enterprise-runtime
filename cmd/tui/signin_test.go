@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/ollama/ollama/cmd/launch"
 )
 
 func TestRenderSignIn_ContainsModelName(t *testing.T) {
@@ -56,7 +55,7 @@ func TestRenderUpgrade_AsksBeforeOpening(t *testing.T) {
 	if !strings.Contains(got, "kimi-k2.6:cloud") {
 		t.Error("should contain model name")
 	}
-	if !strings.Contains(got, launch.DefaultUpgradeURL) {
+	if !strings.Contains(got, DefaultUpgradeURL) {
 		t.Error("should contain upgrade URL")
 	}
 	if !strings.Contains(got, "Open now?") {

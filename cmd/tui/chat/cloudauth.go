@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"github.com/ollama/ollama/cmd/tui"
 	"context"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/cmd/launch"
 	"github.com/ollama/ollama/internal/modelref"
 )
 
@@ -217,7 +217,7 @@ func (m *chatModel) startCloudAuthUpgrade(modelName, requiredPlan string) (tea.M
 		modelName:    modelName,
 		requiredPlan: requiredPlan,
 		kind:         cloudAuthUpgrade,
-		upgradeURL:   launch.DefaultUpgradeURL,
+		upgradeURL:   tui.DefaultUpgradeURL,
 		openNow:      true,
 	}
 	m.status = "cloud-auth"
@@ -414,7 +414,7 @@ func (m chatModel) renderCloudAuthPrompt(width int) string {
 				if u := p.upgradeURL; u != "" {
 					b.WriteString(urlWrap.Render(u))
 				} else {
-					b.WriteString(urlWrap.Render(launch.DefaultUpgradeURL))
+					b.WriteString(urlWrap.Render(tui.DefaultUpgradeURL))
 				}
 				b.WriteString("\n\n")
 			}

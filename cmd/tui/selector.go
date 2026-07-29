@@ -1,13 +1,13 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/ollama/ollama/cmd/launch"
 )
 
 var (
@@ -55,7 +55,7 @@ var (
 const maxSelectorItems = 10
 
 // ErrCancelled is returned when the user cancels the selection.
-var ErrCancelled = launch.ErrCancelled
+var ErrCancelled = errors.New("cancelled")
 
 type SelectItem struct {
 	Name              string
@@ -84,7 +84,7 @@ func waitForSelectorItems(updates <-chan []SelectItem) tea.Cmd {
 }
 
 // ConvertItems converts launch.SelectionItem slice to SelectItem slice.
-func ConvertItems(items []launch.SelectionItem) []SelectItem {
+func ConvertItems(items []SelectItem) []SelectItem {
 	out := make([]SelectItem, len(items))
 	for i, item := range items {
 		out[i] = SelectItem{

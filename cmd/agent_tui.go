@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/ollama/ollama/cmd/tui"
 	"context"
 	"errors"
 	"fmt"
@@ -18,7 +19,6 @@ import (
 	agenttools "github.com/ollama/ollama/agent/tools"
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/cmd/config"
-	"github.com/ollama/ollama/cmd/launch"
 	agentchat "github.com/ollama/ollama/cmd/tui/chat"
 	"github.com/ollama/ollama/format"
 	internalcloud "github.com/ollama/ollama/internal/cloud"
@@ -159,7 +159,7 @@ func GenerateAgentTUI(cmd *cobra.Command, client *api.Client, opts agentTUIOptio
 		CheckCloudModel: func(ctx context.Context, model, requiredPlan string) error {
 			return ensureCloudModelAccess(ctx, client, model, requiredPlan)
 		},
-		OpenBrowser: launch.OpenBrowser,
+		OpenBrowser: tui.OpenBrowser,
 		PollCloudAuth: func(ctx context.Context) (string, bool, error) {
 			user, err := client.Whoami(ctx)
 			if err != nil {
@@ -195,19 +195,17 @@ func selectAgentModel(ctx context.Context, client *api.Client, current string) (
 
 	items := agentSelectionItems(models)
 	switch {
-	case launch.DefaultSingleSelectorWithUpdates != nil:
-		return launch.DefaultSingleSelectorWithUpdates("Select model to run:", items, current, nil)
-	case launch.DefaultSingleSelector != nil:
-		return launch.DefaultSingleSelector("Select model to run:", items, current)
 	default:
+		return tui.SelectSingleWithUpdates("Select model to run:", items, current, nil)
+	// default:
 		return "", errors.New("no selector configured")
 	}
 }
 
-func agentSelectionItems(models []agentchat.ModelOption) []launch.SelectionItem {
-	items := make([]launch.SelectionItem, 0, len(models))
+func agentSelectionItems(models []agentchat.ModelOption) []tui.SelectItem {
+	items := make([]tui.SelectItem, 0, len(models))
 	for _, model := range models {
-		items = append(items, launch.SelectionItem{
+		items = append(items, tui.SelectItem{
 			Name:              model.Name,
 			Description:       agentSelectionDescription(model),
 			Recommended:       model.Recommended,
@@ -647,7 +645,7 @@ func cloudAvailabilityBadges(ctx context.Context, client *api.Client, options []
 		}
 		if !signedIn {
 			badges[opt.Name] = "Sign in required"
-		} else if opt.RequiredPlan != "" && !launch.PlanSatisfies(user.Plan, opt.RequiredPlan) {
+		} else if opt.RequiredPlan != "" && !tui.PlanSatisfies(user.Plan, opt.RequiredPlan) {
 			badges[opt.Name] = "Upgrade required"
 		}
 	}
@@ -739,7 +737,7 @@ func ensureCloudModelAccess(ctx context.Context, client *api.Client, modelName, 
 		return err
 	}
 	if user != nil && user.Name != "" {
-		if requiredPlan != "" && !launch.PlanSatisfies(user.Plan, requiredPlan) {
+		if requiredPlan != "" && !tui.PlanSatisfies(user.Plan, requiredPlan) {
 			return fmt.Errorf("plan upgrade required: %s needs plan %s, you have %s", modelName, requiredPlan, user.Plan)
 		}
 		return nil

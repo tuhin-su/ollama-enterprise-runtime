@@ -7,9 +7,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/ollama/ollama/cmd/launch"
 	"golang.org/x/term"
 )
+
+var SpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 // spinnerStyle dims the spinner so it reads as ancillary status text, matching
 // the sign-in/upgrade spinners in signin.go.
@@ -65,7 +66,7 @@ func (m *spinnerModel) View() string {
 	if m.quitting {
 		return ""
 	}
-	frame := launch.SpinnerFrames[m.frame%len(launch.SpinnerFrames)]
+	frame := SpinnerFrames[m.frame%len(SpinnerFrames)]
 	return spinnerStyle.Render(frame + " " + m.message)
 }
 
@@ -77,7 +78,7 @@ func (m *spinnerModel) View() string {
 // returns. RunSpinner returns nil when there is no interactive terminal, so
 // launch.StartSpinner can fall back to its ANSI spinner for headless/--yes
 // runs.
-func RunSpinner(message string) *launch.Spinner {
+func RunSpinner(message string) *Spinner {
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stderr.Fd())) {
 		return nil
 	}
@@ -106,5 +107,14 @@ func RunSpinner(message string) *launch.Spinner {
 		})
 	}
 
-	return launch.NewSpinner(stop, cancelled)
+	return NewSpinner(stop, cancelled)
+}
+
+type Spinner struct {
+	Stop      func()
+	Cancelled <-chan struct{}
+}
+
+func NewSpinner(stop func(), cancelled <-chan struct{}) *Spinner {
+	return &Spinner{Stop: stop, Cancelled: cancelled}
 }

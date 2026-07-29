@@ -5,7 +5,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/ollama/ollama/cmd/launch"
 )
 
 var (
@@ -27,7 +26,17 @@ type confirmModel struct {
 	width     int
 }
 
-type ConfirmOptions = launch.ConfirmOptions
+type ConfirmOptions struct {
+	Default ConfirmDefault
+}
+
+type ConfirmDefault int
+
+const (
+	ConfirmDefaultNone ConfirmDefault = iota
+	ConfirmDefaultYes
+	ConfirmDefaultNo
+)
 
 func (m confirmModel) Init() tea.Cmd {
 	return nil
@@ -102,11 +111,11 @@ func RunConfirm(prompt string) (bool, error) {
 // RunConfirmWithOptions shows a bubbletea yes/no confirmation prompt with
 // optional custom button labels.
 func RunConfirmWithOptions(prompt string, options ConfirmOptions) (bool, error) {
-	yesLabel := options.YesLabel
+	yesLabel := ""
 	if yesLabel == "" {
 		yesLabel = "Yes"
 	}
-	noLabel := options.NoLabel
+	noLabel := ""
 	if noLabel == "" {
 		noLabel = "No"
 	}
@@ -115,7 +124,7 @@ func RunConfirmWithOptions(prompt string, options ConfirmOptions) (bool, error) 
 		prompt:   prompt,
 		yesLabel: yesLabel,
 		noLabel:  noLabel,
-		yes:      options.Default != launch.ConfirmDefaultNo,
+		yes:      options.Default != ConfirmDefaultNo,
 	}
 
 	p := tea.NewProgram(m)

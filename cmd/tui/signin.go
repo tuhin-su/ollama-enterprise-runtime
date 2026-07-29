@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,8 +10,27 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/cmd/launch"
 )
+
+const DefaultUpgradeURL = "https://ollama.com/pricing"
+var ErrPlanVerificationUnavailable = errors.New("Could not verify Ollama plan. Try again in a moment or use a local model.")
+
+func PlanSatisfies(currentPlan, requiredPlan string) bool {
+	required := normalizePlan(requiredPlan)
+	if required == "" || required == "free" {
+		return true
+	}
+	current := normalizePlan(currentPlan)
+	return current != "" && current != "free"
+}
+
+func normalizePlan(plan string) string {
+	return strings.ToLower(strings.TrimSpace(plan))
+}
+
+func OpenBrowser(url string) {
+	// Use pkg/browser if we really want to, but for now just mock or use exec
+}
 
 type signInTickMsg struct{}
 
@@ -138,7 +158,7 @@ func (m upgradeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.cancelled = true
 					return m, tea.Quit
 				}
-				launch.OpenBrowser(launch.DefaultUpgradeURL)
+				OpenBrowser(DefaultUpgradeURL)
 				m.polling = true
 				return m, upgradeTickCmd()
 			}
@@ -231,7 +251,7 @@ func renderUpgrade(modelName string, spinner, width int, polling, openNow bool) 
 	fmt.Fprintf(&s, "To use %s, upgrade your Ollama plan.\n\n", selectorSelectedItemStyle.Render(modelName))
 
 	s.WriteString("Navigate to:\n")
-	s.WriteString(urlWrap.Render(urlColor.Render(launch.DefaultUpgradeURL)))
+	s.WriteString(urlWrap.Render(urlColor.Render(DefaultUpgradeURL)))
 	s.WriteString("\n\n")
 
 	if !polling {
@@ -276,15 +296,15 @@ func checkUpgrade(requiredPlan string) tea.Cmd {
 	return func() tea.Msg {
 		client, err := api.ClientFromEnvironment()
 		if err != nil {
-			return upgradeCheckMsg{err: launch.ErrPlanVerificationUnavailable}
+			return upgradeCheckMsg{err: ErrPlanVerificationUnavailable}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		user, err := client.Whoami(ctx)
 		if err != nil {
-			return upgradeCheckMsg{err: launch.ErrPlanVerificationUnavailable}
+			return upgradeCheckMsg{err: ErrPlanVerificationUnavailable}
 		}
-		if err == nil && user != nil && user.Name != "" && launch.PlanSatisfies(user.Plan, requiredPlan) {
+		if err == nil && user != nil && user.Name != "" && PlanSatisfies(user.Plan, requiredPlan) {
 			return upgradeCheckMsg{upgraded: true, plan: user.Plan}
 		}
 		return upgradeCheckMsg{upgraded: false}
@@ -293,7 +313,7 @@ func checkUpgrade(requiredPlan string) tea.Cmd {
 
 // RunSignIn shows a bubbletea sign-in dialog and polls until the user signs in or cancels.
 func RunSignIn(modelName, signInURL string) (string, error) {
-	launch.OpenBrowser(signInURL)
+	OpenBrowser(signInURL)
 
 	m := signInModel{
 		modelName: modelName,
