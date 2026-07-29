@@ -744,9 +744,21 @@ func MemoryHandler(cmd *cobra.Command, args []string) error {
 func ModelHandler(cmd *cobra.Command, args []string) error {
 	importPath, _ := cmd.Flags().GetString("import")
 	exportModel, _ := cmd.Flags().GetString("export")
+	updateModel, _ := cmd.Flags().GetString("update")
 
-	if importPath != "" && exportModel != "" {
-		return fmt.Errorf("cannot specify both --import and --export")
+	flagsSet := 0
+	if importPath != "" {
+		flagsSet++
+	}
+	if exportModel != "" {
+		flagsSet++
+	}
+	if updateModel != "" {
+		flagsSet++
+	}
+
+	if flagsSet > 1 {
+		return fmt.Errorf("cannot specify more than one of --import, --export, or --update")
 	}
 
 	if importPath != "" {
@@ -765,6 +777,17 @@ func ModelHandler(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		return ExportHandler(cmd, []string{exportModel, dest})
+	}
+
+	if updateModel != "" {
+		updateDesc, _ := cmd.Flags().GetString("update-description")
+		if updateDesc == "" {
+			updateDesc, _ = cmd.Flags().GetString("update-discription")
+		}
+		if err := checkServerHeartbeat(cmd, []string{updateModel}); err != nil {
+			return err
+		}
+		return UpdateModelHandler(cmd, updateModel, updateDesc)
 	}
 
 	return cmd.Help()
@@ -893,6 +916,57 @@ func ExportHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("Export completed successfully.")
+	return nil
+}
+
+// UpdateModelHandler handles updating an existing model's properties.
+func UpdateModelHandler(cmd *cobra.Command, modelName, updateDesc string) error {
+	client, err := api.ClientFromEnvironment()
+	if err != nil {
+		return err
+	}
+
+	modelfileContent := fmt.Sprintf("FROM %s\n", modelName)
+	if updateDesc != "" {
+		modelfileContent += fmt.Sprintf("DESCRIPTION %q\n", updateDesc)
+	}
+	
+	reader := strings.NewReader(modelfileContent)
+	modelfile, err := parser.ParseFile(reader)
+	if err != nil {
+		return err
+	}
+
+	req, err := modelfile.CreateRequest(".")
+	if err != nil {
+		return err
+	}
+	req.Model = modelName
+
+	p := progress.NewProgress(os.Stderr)
+	defer p.Stop()
+	
+	status := "updating model"
+	spinner := progress.NewSpinner(status)
+	p.Add(status, spinner)
+
+	fn := func(resp api.ProgressResponse) error {
+		if resp.Digest != "" {
+			spinner.Stop()
+		} else if status != resp.Status {
+			spinner.Stop()
+			status = resp.Status
+			spinner = progress.NewSpinner(status)
+			p.Add(status, spinner)
+		}
+		return nil
+	}
+
+	if err := client.Create(cmd.Context(), req, fn); err != nil {
+		return err
+	}
+
+	spinner.Stop()
 	return nil
 }
 
@@ -2697,6 +2771,10 @@ func NewCLI() *cobra.Command {
 	modelCmd.Flags().String("import", "", "Import model from this GGUF file path")
 	modelCmd.Flags().String("export", "", "Export model name to a GGUF destination (specified with --dest)")
 	modelCmd.Flags().String("dest", "", "Destination file or directory path (used with --export)")
+	modelCmd.Flags().String("update", "", "Update an existing model")
+	modelCmd.Flags().String("update-description", "", "New description for the updated model")
+	modelCmd.Flags().String("update-discription", "", "Alias for update-description")
+	modelCmd.Flags().MarkHidden("update-discription")
 	modelCmd.Flags().StringP("name", "n", "", "Model name (default: derived from filename)")
 	modelCmd.Flags().String("description", "", "Set the description for the imported model")
 	modelCmd.Flags().String("mmproj", "", "Path to multimodal projector GGUF file for vision models / custom destination path")
