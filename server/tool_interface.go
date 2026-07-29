@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -92,6 +93,9 @@ func (s *Server) ToolInterfaceHandler(c *gin.Context) {
 		globalToolServer.ConnectedTools[auth.ToolName] = conn
 		if auth.ToolSchema.Type != "" {
 			globalToolServer.ConnectedToolSchemas[auth.ToolName] = auth.ToolSchema
+			if globalToolManager != nil {
+				_ = globalToolManager.AddTool(c.Request.Context(), auth.ToolName, auth.ToolSchema)
+			}
 		}
 		log.Printf("Tool '%s' connected to Tool Interface.\n", auth.ToolName)
 	}
@@ -174,6 +178,9 @@ func (s *Server) ToolInterfaceHandler(c *gin.Context) {
 	} else if auth.Role == "tool" {
 		delete(globalToolServer.ConnectedTools, auth.ToolName)
 		delete(globalToolServer.ConnectedToolSchemas, auth.ToolName)
+		if globalToolManager != nil {
+			globalToolManager.RemoveTool(context.Background(), auth.ToolName)
+		}
 		log.Printf("Tool '%s' disconnected.\n", auth.ToolName)
 	}
 	globalToolServer.Unlock()

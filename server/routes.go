@@ -2044,6 +2044,11 @@ func Serve(ln net.Listener) error {
 		return err
 	}
 
+	// Initialize the RAG ToolManager Database
+	if err := InitToolManager(context.Background()); err != nil {
+		slog.Warn("failed to initialize ToolManager", "error", err)
+	}
+
 	if useClient2 {
 		slog.Warn("OLLAMA_EXPERIMENT=client2 is no longer available. Please remove this environment.")
 	}
@@ -2520,11 +2525,32 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		return
 	}
 
-	// Dynamically inject any connected tools into the request context!
+	// Dynamically inject the ToolManager search meta-tool if there are connected tools
 	activeTools := globalToolServer.GetActiveTools()
 	if len(activeTools) > 0 {
-		req.Tools = append(req.Tools, activeTools...)
-		slog.Info("Injected connected tools into ChatRequest", "count", len(activeTools))
+		var searchTool api.Tool
+		err := json.Unmarshal([]byte(`{
+			"type": "function",
+			"function": {
+				"name": "toolmanager.search",
+				"description": "Search the vector database for a connected tool that matches your needs.",
+				"parameters": {
+					"type": "object",
+					"required": ["query"],
+					"properties": {
+						"query": {
+							"type": "string",
+							"description": "The search query to find the tool you need (e.g., 'math calculation')"
+						}
+					}
+				}
+			}
+		}`), &searchTool)
+		
+		if err == nil {
+			req.Tools = append(req.Tools, searchTool)
+			slog.Info("Injected toolmanager.search meta-tool into ChatRequest", "active_tools_count", len(activeTools))
+		}
 	}
 
 	var fallbackReason string
