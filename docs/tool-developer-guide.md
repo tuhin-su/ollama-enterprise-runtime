@@ -43,7 +43,20 @@ When a model decides to invoke a tool, its response will include a `tool_calls` 
 3. Append a new message to the conversation history with `role: "tool"` and the output of the function.
 4. Send the updated conversation back to Ollama to synthesize the final response.
 
-## 2. Developing Client Applications
+## 2. Dynamic Tool Registration (WebSockets)
+
+Ollama utilizes a **RAG Tool Architecture** backed by a LanceDB vector database to prevent context window bloat. Instead of passing massive lists of tools in your `/api/chat` payload, developers can connect persistent tool scripts via WebSockets!
+
+### Connecting a Tool Script
+1. Connect a WebSocket client to Ollama (typically ws://localhost:11434).
+2. Send a `register` payload containing your tool's JSON schema.
+3. Ollama automatically embeds your tool's description and stores it in the `ToolManager` database.
+4. When a user chats with Ollama, the AI uses a single `toolmanager.search` meta-tool to query for your specific tool based on semantic meaning!
+5. When the AI selects your tool, the backend sends an `execute` payload down your WebSocket connection.
+
+*Benefits:* The model's context window stays incredibly lean, and you can expose hundreds of custom tools to Ollama without any performance degradation.
+
+## 3. Developing Client Applications
 
 Client applications can interact with Ollama via its robust REST API or official SDKs (`ollama-python` and `ollama-js`).
 
