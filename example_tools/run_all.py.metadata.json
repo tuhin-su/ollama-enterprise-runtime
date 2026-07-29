@@ -1,0 +1,5 @@
+{
+  "summary": "Runner script that starts all four example tools concurrently in separate subprocesses.",
+  "updatedAt": "2026-07-29T11:49:43.512698721Z",
+  "userFacing": true
+}

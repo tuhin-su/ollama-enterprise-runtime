@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/server/memory"
@@ -46,8 +47,12 @@ func InitToolManager(ctx context.Context, s *Server) error {
 
 	slog.Info("ToolManager initialized with volatile vector DB", "path", dbDir)
 
-	// Register built-in tools (Memory & Chain) dynamically instead of bloating context
-	globalToolManager.RegisterBuiltinTools(ctx, s)
+	// Register built-in tools (Memory & Chain) in a background goroutine
+	// to prevent bootstrap deadlock before the HTTP server starts listening.
+	go func() {
+		time.Sleep(1 * time.Second)
+		globalToolManager.RegisterBuiltinTools(ctx, s)
+	}()
 
 	return nil
 }

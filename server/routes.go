@@ -2767,7 +2767,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		}
 
 		msgs = filterThinkTags(msgs, m)
-		req.Messages = msgs
+		req.Messages = MergeSystemMessages(msgs)
 
 		for k, v := range m.Options {
 			if _, ok := req.Options[k]; !ok {
@@ -2888,6 +2888,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	memUID := memoryUserID(&req, c.Request.RemoteAddr)
 	hasTools := slices.Contains(m.Capabilities(), model.CapabilityTools)
 	msgs = injectMemoryIntoMessages(c.Request.Context(), s, memUID, &req, msgs, hasTools)
+	msgs = MergeSystemMessages(msgs)
 	// -----------------------------------------------------------------------
 
 	if shouldUseHarmony(m) {
@@ -3244,19 +3245,19 @@ func (s *Server) ChatHandler(c *gin.Context) {
 				break
 			}
 
-			// Check if we have memory tool calls to execute
-			var memoryCalls []api.ToolCall
+			// Check if we have tool calls to execute (memory tools or websocket tools)
+			var toolCalls []api.ToolCall
 			for _, tc := range fullMessage.ToolCalls {
-				if IsMemoryTool(tc.Function.Name) {
-					memoryCalls = append(memoryCalls, tc)
+				if IsMemoryTool(tc.Function.Name) || globalToolServer.HasTool(tc.Function.Name) || tc.Function.Name == "toolmanager.search" {
+					toolCalls = append(toolCalls, tc)
 				}
 			}
 
-			if len(memoryCalls) > 0 {
+			if len(toolCalls) > 0 {
 				fullMessage.Role = "assistant"
 				newMessages := append(currentMessages, fullMessage)
 
-				for _, tc := range memoryCalls {
+				for _, tc := range toolCalls {
 					var resultStr string
 					var execErr error
 
@@ -3295,7 +3296,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 							execErr = fmt.Errorf("failed to re-acquire model after chain: %w", err)
 						}
 					} else {
-						resultStr, execErr = s.ExecuteMemoryTool(c.Request.Context(), memUID, tc)
+						resultStr, execErr = executeToolOrMemory(c.Request.Context(), s, memUID, tc)
 					}
 
 					if execErr != nil {
@@ -3428,6 +3429,8 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 	memUID := memoryUserID(&req, c.Request.RemoteAddr)
 	ch := make(chan any)
 	go func() {
+		VRAMArbiter.RLock()
+		defer VRAMArbiter.RUnlock()
 		defer close(ch)
 
 		var runChat func(currentMessages []api.Message)
@@ -3481,7 +3484,7 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 				// Check if there are memory tool calls in this chunk or in the accumulated message
 				hasMemoryTool := false
 				for _, tc := range fullMessage.ToolCalls {
-					if IsMemoryTool(tc.Function.Name) {
+					if IsMemoryTool(tc.Function.Name) || globalToolServer.HasTool(tc.Function.Name) || tc.Function.Name == "toolmanager.search" {
 						hasMemoryTool = true
 						break
 					}
@@ -3505,19 +3508,19 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 				return
 			}
 
-			// Check if we have memory tool calls to execute
-			var memoryCalls []api.ToolCall
+			// Check if we have tool calls to execute (memory tools or websocket tools)
+			var toolCalls []api.ToolCall
 			for _, tc := range fullMessage.ToolCalls {
-				if IsMemoryTool(tc.Function.Name) {
-					memoryCalls = append(memoryCalls, tc)
+				if IsMemoryTool(tc.Function.Name) || globalToolServer.HasTool(tc.Function.Name) || tc.Function.Name == "toolmanager.search" {
+					toolCalls = append(toolCalls, tc)
 				}
 			}
 
-			if len(memoryCalls) > 0 {
+			if len(toolCalls) > 0 {
 				fullMessage.Role = "assistant"
 				newMessages := append(currentMessages, fullMessage)
 
-				for _, tc := range memoryCalls {
+				for _, tc := range toolCalls {
 					var resultStr string
 					var execErr error
 
@@ -3557,7 +3560,7 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 							execErr = fmt.Errorf("failed to re-acquire model after chain: %w", schedErr)
 						}
 					} else {
-						resultStr, execErr = s.ExecuteMemoryTool(c.Request.Context(), memUID, tc)
+						resultStr, execErr = executeToolOrMemory(c.Request.Context(), s, memUID, tc)
 					}
 
 					if execErr != nil {
@@ -4020,6 +4023,7 @@ func (s *Server) AnthropicMessagesHandler(c *gin.Context) {
 			})
 			ch <- fmt.Sprintf("event: content_block_start\ndata: %s\n\n", string(cStartBytes))
 
+			VRAMArbiter.RLock()
 			_ = r.Chat(c.Request.Context(), nativeReq, func(resp llm.ChatResponse) {
 				if resp.Message.Content != "" {
 					deltaBytes, _ := json.Marshal(map[string]any{
@@ -4033,6 +4037,7 @@ func (s *Server) AnthropicMessagesHandler(c *gin.Context) {
 					ch <- fmt.Sprintf("event: content_block_delta\ndata: %s\n\n", string(deltaBytes))
 				}
 			})
+			VRAMArbiter.RUnlock()
 
 			cStopBytes, _ := json.Marshal(map[string]any{
 				"type":  "content_block_stop",
@@ -4066,9 +4071,11 @@ func (s *Server) AnthropicMessagesHandler(c *gin.Context) {
 		})
 	} else {
 		var assistantText string
+		VRAMArbiter.RLock()
 		err = r.Chat(c.Request.Context(), nativeReq, func(resp llm.ChatResponse) {
 			assistantText += resp.Message.Content
 		})
+		VRAMArbiter.RUnlock()
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -4093,3 +4100,75 @@ func (s *Server) AnthropicMessagesHandler(c *gin.Context) {
 		})
 	}
 }
+
+func isTier3Tool(name string) bool {
+	return name == "python_sandbox" || name == "restart_server" || name == "read_system_logs" || name == "system_tool"
+}
+
+func executeToolOrMemory(ctx context.Context, s *Server, memUID string, tc api.ToolCall) (string, error) {
+	// Intercept the vector RAG search tool
+	if tc.Function.Name == "toolmanager.search" {
+		if globalToolManager == nil {
+			return "", fmt.Errorf("tool manager not initialized")
+		}
+		args := tc.Function.Arguments.ToMap()
+		query, _ := args["query"].(string)
+		if query == "" {
+			return "", fmt.Errorf("query parameter is required")
+		}
+		results, err := globalToolManager.SearchTools(ctx, query, 3)
+		if err != nil {
+			return "", err
+		}
+		resBytes, _ := json.Marshal(results)
+		return string(resBytes), nil
+	}
+
+	// Security: Risk Tier 3 confirmation gate to prevent prompt injection attacks
+	if isTier3Tool(tc.Function.Name) {
+		args := tc.Function.Arguments.ToMap()
+		confirmed, _ := args["user_confirmed"].(bool)
+		if !confirmed {
+			return "", fmt.Errorf("security policy violation: tool '%s' is Tier 3 (High-Risk) and requires explicit 'user_confirmed: true' parameter, which must be authorized by a human operator", tc.Function.Name)
+		}
+	}
+
+	if IsMemoryTool(tc.Function.Name) {
+		return s.ExecuteMemoryTool(ctx, memUID, tc)
+	}
+	if globalToolServer.HasTool(tc.Function.Name) {
+		resp, err := globalToolServer.ExecuteTool(ctx, tc.Function.Name, tc.Function.Arguments.ToMap())
+		if err != nil {
+			return "", err
+		}
+		resBytes, _ := json.Marshal(resp)
+		return string(resBytes), nil
+	}
+	return "", fmt.Errorf("unknown tool: %s", tc.Function.Name)
+}
+
+func MergeSystemMessages(msgs []api.Message) []api.Message {
+	var systemContents []string
+	var otherMsgs []api.Message
+	for _, m := range msgs {
+		if m.Role == "system" {
+			if m.Content != "" {
+				systemContents = append(systemContents, m.Content)
+			}
+		} else {
+			otherMsgs = append(otherMsgs, m)
+		}
+	}
+	if len(systemContents) == 0 {
+		return otherMsgs
+	}
+	mergedSystem := ""
+	for i, content := range systemContents {
+		if i > 0 {
+			mergedSystem += "\n\n"
+		}
+		mergedSystem += content
+	}
+	return append([]api.Message{{Role: "system", Content: mergedSystem}}, otherMsgs...)
+}
+

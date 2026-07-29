@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -12,6 +13,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/ollama/ollama/api"
 )
+
+// VRAMArbiter arbitrates VRAM usage across concurrent request types (live chat, background task scheduler, and chaining)
+var VRAMArbiter sync.RWMutex
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -26,6 +30,7 @@ type ToolServer struct {
 	ConnectedTools       map[string]*websocket.Conn
 	ConnectedToolSchemas map[string]api.Tool
 	PendingRequests      map[string]*websocket.Conn
+	PendingHTTPRequests  map[string]chan map[string]interface{}
 }
 
 var globalToolServer = &ToolServer{
@@ -33,6 +38,7 @@ var globalToolServer = &ToolServer{
 	ConnectedTools:       make(map[string]*websocket.Conn),
 	ConnectedToolSchemas: make(map[string]api.Tool),
 	PendingRequests:      make(map[string]*websocket.Conn),
+	PendingHTTPRequests:  make(map[string]chan map[string]interface{}),
 }
 
 type AuthMessage struct {
@@ -152,6 +158,11 @@ func (s *Server) ToolInterfaceHandler(c *gin.Context) {
 				globalToolServer.Lock()
 				modelConn := globalToolServer.PendingRequests[m.RequestID]
 				delete(globalToolServer.PendingRequests, m.RequestID) // clean up
+				
+				httpCh, ok := globalToolServer.PendingHTTPRequests[m.RequestID]
+				if ok {
+					delete(globalToolServer.PendingHTTPRequests, m.RequestID)
+				}
 				globalToolServer.Unlock()
 
 				if modelConn != nil {
@@ -161,6 +172,8 @@ func (s *Server) ToolInterfaceHandler(c *gin.Context) {
 						"source_tool": m.SourceTool,
 						"payload":     m.Payload,
 					})
+				} else if ok && httpCh != nil {
+					httpCh <- m.Payload
 				}
 			}
 		}
@@ -195,4 +208,57 @@ func (s *ToolServer) GetActiveTools() []api.Tool {
 		tools = append(tools, schema)
 	}
 	return tools
+}
+
+// HasTool returns true if the tool is connected over WS.
+func (s *ToolServer) HasTool(name string) bool {
+	s.RLock()
+	defer s.RUnlock()
+	_, ok := s.ConnectedTools[name]
+	return ok
+}
+
+// ExecuteTool synchronously sends an execution request to a connected WebSocket tool and awaits its response.
+func (s *ToolServer) ExecuteTool(ctx context.Context, toolName string, payload map[string]interface{}) (map[string]interface{}, error) {
+	s.RLock()
+	conn, ok := s.ConnectedTools[toolName]
+	s.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("tool '%s' is not connected", toolName)
+	}
+
+	// Generate a unique Request ID (simple timestamp + nanoseconds)
+	reqID := fmt.Sprintf("req_%d_%d", time.Now().Unix(), time.Now().UnixNano())
+	ch := make(chan map[string]interface{}, 1)
+
+	s.Lock()
+	s.PendingHTTPRequests[reqID] = ch
+	s.Unlock()
+
+	defer func() {
+		s.Lock()
+		delete(s.PendingHTTPRequests, reqID)
+		s.Unlock()
+	}()
+
+	// Send execution request to WebSocket tool
+	err := conn.WriteJSON(map[string]interface{}{
+		"type":       "execute_tool",
+		"request_id": reqID,
+		"payload":    payload,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request to tool: %w", err)
+	}
+
+	// Wait for response or timeout (15s)
+	select {
+	case resp := <-ch:
+		return resp, nil
+	case <-time.After(15 * time.Second):
+		return nil, fmt.Errorf("tool execution timed out after 15 seconds")
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }

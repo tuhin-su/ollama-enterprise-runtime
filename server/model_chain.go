@@ -175,6 +175,8 @@ func (s *Server) ExecuteChainPipeline(
 	progressFn func(msg string),
 	images []api.ImageData,
 ) (string, error) {
+	VRAMArbiter.Lock()
+	defer VRAMArbiter.Unlock()
 
 	args := toolCall.Function.Arguments.ToMap()
 

@@ -199,7 +199,10 @@ func (ts *TaskScheduler) executeJob(ctx context.Context, job *ScheduledJob) {
 		"model", job.Model,
 	)
 
+	// Acquire exclusive VRAM lock before executing background model execution
+	VRAMArbiter.Lock()
 	result, execErr := ts.runPrompt(ctx, job.Model, job.SystemPrompt, job.Prompt)
+	VRAMArbiter.Unlock()
 
 	ts.mu.Lock()
 	live = ts.jobs[job.ID]
