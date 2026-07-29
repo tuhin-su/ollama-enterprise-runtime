@@ -475,6 +475,11 @@ func ImportHandler(cmd *cobra.Command, args []string) error {
 
 	// Build synthetic Modelfile content
 	modelfileContent := fmt.Sprintf("FROM %s\n", absPath)
+	
+	description, _ := cmd.Flags().GetString("description")
+	if description != "" {
+		modelfileContent += fmt.Sprintf("DESCRIPTION %q\n", description)
+	}
 
 	mmprojPath, _ := cmd.Flags().GetString("mmproj")
 	if mmprojPath != "" {
@@ -2693,6 +2698,7 @@ func NewCLI() *cobra.Command {
 	modelCmd.Flags().String("export", "", "Export model name to a GGUF destination (specified with --dest)")
 	modelCmd.Flags().String("dest", "", "Destination file or directory path (used with --export)")
 	modelCmd.Flags().StringP("name", "n", "", "Model name (default: derived from filename)")
+	modelCmd.Flags().String("description", "", "Set the description for the imported model")
 	modelCmd.Flags().String("mmproj", "", "Path to multimodal projector GGUF file for vision models / custom destination path")
 	modelCmd.Flags().StringP("quantize", "q", "", "Quantize model to this level (e.g. q4_K_M)")
 
