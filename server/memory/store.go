@@ -931,7 +931,7 @@ func (s *LanceDBStore) Export(ctx context.Context) ([]*Memory, []*Conversation, 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var memories []*Memory
+	memories := make([]*Memory, 0)
 	memTable, err := s.conn.OpenTable(ctx, "memories")
 	if err == nil {
 		defer memTable.Close()
@@ -943,7 +943,7 @@ func (s *LanceDBStore) Export(ctx context.Context) ([]*Memory, []*Conversation, 
 		}
 	}
 
-	var conversations []*Conversation
+	conversations := make([]*Conversation, 0)
 	convTable, err := s.conn.OpenTable(ctx, "conversations")
 	if err == nil {
 		defer convTable.Close()
@@ -955,7 +955,7 @@ func (s *LanceDBStore) Export(ctx context.Context) ([]*Memory, []*Conversation, 
 		}
 	}
 
-	var specialMemories []*SpecialMemory
+	specialMemories := make([]*SpecialMemory, 0)
 	specTable, err := s.conn.OpenTable(ctx, "special_memories")
 	if err == nil {
 		defer specTable.Close()

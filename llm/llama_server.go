@@ -877,7 +877,11 @@ func NewLlamaServerRunner(
 	}
 
 	gpuLibs := ml.LibraryPaths(gpus)
-	status := NewStatusWriter(os.Stderr)
+	var out io.Writer
+	if envconfig.LogLevel() <= slog.LevelDebug {
+		out = os.Stderr
+	}
+	status := NewStatusWriter(out)
 
 	// memWriter wraps the status writer and parses buffer size lines from llama-server logs
 	memWriter := &memoryParsingWriter{inner: status}

@@ -3295,6 +3295,21 @@ func (s *Server) ChatHandler(c *gin.Context) {
 						Model:    req.Model,
 						Messages: toMemoryMessages(currentMessages),
 					}, fullMessage.Content)
+
+					// Save the explicit conversation history
+					conv := &memory.Conversation{
+						UserID:           memUID,
+						Model:            req.Model,
+						UserMessage:      lastUserMsg,
+						AssistantMessage: fullMessage.Content,
+						Timestamp:        time.Now().UTC(),
+					}
+					go func() {
+						store := memoryEngine.Store()
+						if err := store.SaveConversation(context.Background(), conv); err != nil {
+							slog.Warn("failed to save conversation turn", "error", err)
+						}
+					}()
 				}
 			}
 		}
@@ -3537,21 +3552,31 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 					}
 				}
 
-				conv := &memory.Conversation{
-					UserID:           memUID,
-					Model:            req.Model,
-					UserMessage:      lastUserMsg,
-					AssistantMessage: fullMessage.Content,
-					Thinking:         fullMessage.Thinking,
-					Timestamp:        time.Now().UTC(),
-				}
+				if lastUserMsg != "" {
+					// Extract unstructured memories
+					memoryEngine.ProcessResponse(c.Request.Context(), &memory.MemoryRequest{
+						UserID:   memUID,
+						Model:    req.Model,
+						Messages: toMemoryMessages(currentMessages),
+					}, fullMessage.Content)
 
-				go func() {
-					store := memoryEngine.Store()
-					if err := store.SaveConversation(context.Background(), conv); err != nil {
-						slog.Warn("failed to save conversation turn", "error", err)
+					// Save the explicit conversation history
+					conv := &memory.Conversation{
+						UserID:           memUID,
+						Model:            req.Model,
+						UserMessage:      lastUserMsg,
+						AssistantMessage: fullMessage.Content,
+						Thinking:         fullMessage.Thinking,
+						Timestamp:        time.Now().UTC(),
 					}
-				}()
+
+					go func() {
+						store := memoryEngine.Store()
+						if err := store.SaveConversation(context.Background(), conv); err != nil {
+							slog.Warn("failed to save conversation turn", "error", err)
+						}
+					}()
+				}
 			}
 
 			// If we suppressed chunks due to no memory tool call or if it was the final turn,

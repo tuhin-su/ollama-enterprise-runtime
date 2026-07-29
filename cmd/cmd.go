@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/gob"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -452,13 +454,24 @@ func importMemory(ctx context.Context, srcPath string) error {
 		return fmt.Errorf("failed to read source file: %w", err)
 	}
 
-	var exp struct {
+	type ExportData struct {
 		Memories        []*memory.Memory        `json:"memories"`
 		Conversations   []*memory.Conversation   `json:"conversations"`
 		SpecialMemories []*memory.SpecialMemory `json:"special_memories"`
 	}
-	if err := json.Unmarshal(data, &exp); err != nil {
-		return fmt.Errorf("failed to parse memory JSON (note: only JSON format memory imports are supported): %w", err)
+	var exp ExportData
+
+	if strings.HasSuffix(strings.ToLower(absSrcPath), ".json") {
+		if err := json.Unmarshal(data, &exp); err != nil {
+			return fmt.Errorf("failed to parse memory JSON: %w", err)
+		}
+	} else {
+		// Default to gob (dat) format
+		buf := bytes.NewReader(data)
+		decoder := gob.NewDecoder(buf)
+		if err := decoder.Decode(&exp); err != nil {
+			return fmt.Errorf("failed to parse memory DAT (gob format): %w", err)
+		}
 	}
 
 	cfg := memory.LoadConfig()
@@ -693,21 +706,32 @@ func exportMemory(ctx context.Context, destPath, format string) error {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
+	type ExportData struct {
+		Memories        []*memory.Memory        `json:"memories"`
+		Conversations   []*memory.Conversation   `json:"conversations"`
+		SpecialMemories []*memory.SpecialMemory `json:"special_memories"`
+	}
+	exp := ExportData{
+		Memories:        mems,
+		Conversations:   convs,
+		SpecialMemories: specs,
+	}
+
 	if format == "json" {
-		exp := struct {
-			Memories        []*memory.Memory        `json:"memories"`
-			Conversations   []*memory.Conversation   `json:"conversations"`
-			SpecialMemories []*memory.SpecialMemory `json:"special_memories"`
-		}{
-			Memories:        mems,
-			Conversations:   convs,
-			SpecialMemories: specs,
-		}
 		data, err := json.MarshalIndent(exp, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal memory to JSON: %w", err)
 		}
 		if err := os.WriteFile(absDestPath, data, 0644); err != nil {
+			return fmt.Errorf("failed to write memory to file: %w", err)
+		}
+	} else if format == "dat" {
+		var buf bytes.Buffer
+		encoder := gob.NewEncoder(&buf)
+		if err := encoder.Encode(exp); err != nil {
+			return fmt.Errorf("failed to encode memory to DAT format: %w", err)
+		}
+		if err := os.WriteFile(absDestPath, buf.Bytes(), 0644); err != nil {
 			return fmt.Errorf("failed to write memory to file: %w", err)
 		}
 	} else {
@@ -2826,7 +2850,7 @@ func NewCLI() *cobra.Command {
 
 	memoryCmd.Flags().String("export", "", "Export memory database to this path")
 	memoryCmd.Flags().String("import", "", "Import memory database from this JSON file path")
-	memoryCmd.Flags().String("format", "default", "Format for memory export (json or default)")
+	memoryCmd.Flags().String("format", "dat", "Format for memory export (dat, json, or text)")
 	memoryCmd.Flags().Bool("wipe", false, "Wipe (delete) all stored memory data")
 
 	modelCmd := &cobra.Command{
