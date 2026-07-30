@@ -18,7 +18,7 @@ func (r *CogitoRenderer) LeadingBOS() string {
 func (r *CogitoRenderer) Render(messages []api.Message, tools []api.Tool, thinkValue *api.ThinkValue) (string, error) {
 	var sb strings.Builder
 
-	defaultPrompt := "You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco."
+	defaultPrompt := "You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco."
 
 	// thinking is enabled: model must support it AND user must request it (true)
 	enableThinking := r.isThinking && (thinkValue != nil && thinkValue.Bool())

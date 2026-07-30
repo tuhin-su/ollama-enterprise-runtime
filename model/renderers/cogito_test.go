@@ -22,7 +22,7 @@ func TestCogitoRenderer(t *testing.T) {
 				{Role: "user", Content: "Hello, how are you?"},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected:   `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello, how are you?<｜Assistant｜>`,
+			expected:   `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello, how are you?<｜Assistant｜>`,
 		},
 		{
 			name: "basic with system message",
@@ -31,7 +31,7 @@ func TestCogitoRenderer(t *testing.T) {
 				{Role: "user", Content: "Hello, how are you?"},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected: `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
+			expected: `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
 
 You are a helpful assistant.<｜User｜>Hello, how are you?<｜Assistant｜>`,
 		},
@@ -43,7 +43,7 @@ You are a helpful assistant.<｜User｜>Hello, how are you?<｜Assistant｜>`,
 				{Role: "user", Content: "Fantastic!"},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected:   `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>What is the capital of France?<｜Assistant｜>The capital of France is Paris.<｜end▁of▁sentence｜><｜User｜>Fantastic!<｜Assistant｜>`,
+			expected:   `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>What is the capital of France?<｜Assistant｜>The capital of France is Paris.<｜end▁of▁sentence｜><｜User｜>Fantastic!<｜Assistant｜>`,
 		},
 		{
 			name: "thinking enabled without system",
@@ -53,7 +53,7 @@ You are a helpful assistant.<｜User｜>Hello, how are you?<｜Assistant｜>`,
 			thinkValue: &api.ThinkValue{Value: true},
 			expected: `<｜begin▁of▁sentence｜>Enable deep thinking subroutine.
 
-You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello, how are you?<｜Assistant｜><think>
+You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello, how are you?<｜Assistant｜><think>
 `,
 		},
 		{
@@ -65,7 +65,7 @@ You are Cogito, an AI assistant created by Deep Cogito, which is an AI research 
 			thinkValue: &api.ThinkValue{Value: true},
 			expected: `<｜begin▁of▁sentence｜>Enable deep thinking subroutine.
 
-You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
+You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
 
 You are a helpful assistant.
 
@@ -78,7 +78,7 @@ You are a helpful assistant.
 				{Role: "user", Content: "Hello, how are you?"},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected:   `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello, how are you?<｜Assistant｜>`,
+			expected:   `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello, how are you?<｜Assistant｜>`,
 		},
 		{
 			name: "with tools",
@@ -105,7 +105,7 @@ You are a helpful assistant.
 					},
 				},
 			},
-			expected: `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
+			expected: `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
 You have the following functions available:
 ` + "```json\n" + `{
     "type": "function",
@@ -148,7 +148,7 @@ You have the following functions available:
 				},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected: `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>What's the weather in Paris?<｜Assistant｜>I'll check the weather in Paris for you.<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>get_weather
+			expected: `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>What's the weather in Paris?<｜Assistant｜>I'll check the weather in Paris for you.<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>get_weather
 ` + "```json\n" + `{"location":"Paris"}
 ` + "```" + `<｜tool▁call▁end｜><｜tool▁calls▁end｜><｜end▁of▁sentence｜><｜Assistant｜>`,
 		},
@@ -172,7 +172,7 @@ You have the following functions available:
 				{Role: "tool", Content: "Temperature: 22°C, Sunny"},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected: `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>What's the weather in Paris?<｜Assistant｜><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>get_weather
+			expected: `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>What's the weather in Paris?<｜Assistant｜><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>get_weather
 ` + "```json\n" + `{"location":"Paris"}
 ` + "```" + `<｜tool▁call▁end｜><｜tool▁calls▁end｜><｜end▁of▁sentence｜><｜tool▁outputs▁begin｜><｜tool▁output▁begin｜>Temperature: 22°C, Sunny<｜tool▁output▁end｜><｜tool▁outputs▁end｜><｜Assistant｜>`,
 		},
@@ -205,7 +205,7 @@ You have the following functions available:
 				{Role: "tool", Content: "London: 18°C, Cloudy"},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected: `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Get weather for Paris and London<｜Assistant｜><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>get_weather
+			expected: `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Get weather for Paris and London<｜Assistant｜><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>get_weather
 ` + "```json\n" + `{"location":"Paris"}
 ` + "```" + `<｜tool▁call▁end｜>
 <｜tool▁call▁begin｜>function<｜tool▁sep｜>get_weather
@@ -240,7 +240,7 @@ You have the following functions available:
 			thinkValue: &api.ThinkValue{Value: true},
 			expected: `<｜begin▁of▁sentence｜>Enable deep thinking subroutine.
 
-You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
+You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
 You have the following functions available:
 ` + "```json\n" + `{
     "type": "function",
@@ -271,7 +271,7 @@ You have the following functions available:
 				{Role: "user", Content: "Hello"},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected:   `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello<｜Assistant｜>`,
+			expected:   `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello<｜Assistant｜>`,
 		},
 		{
 			name: "single_turn_thinking_true",
@@ -281,7 +281,7 @@ You have the following functions available:
 			thinkValue: &api.ThinkValue{Value: true},
 			expected: `<｜begin▁of▁sentence｜>Enable deep thinking subroutine.
 
-You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello<｜Assistant｜><think>
+You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello<｜Assistant｜><think>
 `,
 		},
 		{
@@ -292,7 +292,7 @@ You are Cogito, an AI assistant created by Deep Cogito, which is an AI research 
 				{Role: "user", Content: "How are you?"},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected:   `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello<｜Assistant｜>Hi there!<｜end▁of▁sentence｜><｜User｜>How are you?<｜Assistant｜>`,
+			expected:   `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello<｜Assistant｜>Hi there!<｜end▁of▁sentence｜><｜User｜>How are you?<｜Assistant｜>`,
 		},
 		{
 			name: "multi_turn_thinking_true",
@@ -304,7 +304,7 @@ You are Cogito, an AI assistant created by Deep Cogito, which is an AI research 
 			thinkValue: &api.ThinkValue{Value: true},
 			expected: `<｜begin▁of▁sentence｜>Enable deep thinking subroutine.
 
-You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello<｜Assistant｜>Hi there!<｜end▁of▁sentence｜><｜User｜>How are you?<｜Assistant｜><think>
+You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello<｜Assistant｜>Hi there!<｜end▁of▁sentence｜><｜User｜>How are you?<｜Assistant｜><think>
 `,
 		},
 		{
@@ -315,7 +315,7 @@ You are Cogito, an AI assistant created by Deep Cogito, which is an AI research 
 				{Role: "assistant", Content: "Okay"},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected: `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
+			expected: `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
 
 You are a helpful assistant<｜User｜>Start<｜Assistant｜>Okay<｜end▁of▁sentence｜><｜Assistant｜>`,
 		},
@@ -329,7 +329,7 @@ You are a helpful assistant<｜User｜>Start<｜Assistant｜>Okay<｜end▁of▁
 			thinkValue: &api.ThinkValue{Value: true},
 			expected: `<｜begin▁of▁sentence｜>Enable deep thinking subroutine.
 
-You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
+You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
 
 You are a helpful assistant
 
@@ -345,7 +345,7 @@ You are a helpful assistant
 				{Role: "user", Content: "Tell me more about LLMs."},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected: `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
+			expected: `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
 
 You are a pirate chatbot who always responds in pirate speak!<｜User｜>Give me a short introduction to LLMs.<｜Assistant｜>Arrr! I'm a pirate<｜end▁of▁sentence｜><｜User｜>Tell me more about LLMs.<｜Assistant｜>`,
 		},
@@ -360,7 +360,7 @@ You are a pirate chatbot who always responds in pirate speak!<｜User｜>Give me
 			thinkValue: &api.ThinkValue{Value: true},
 			expected: `<｜begin▁of▁sentence｜>Enable deep thinking subroutine.
 
-You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
+You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
 
 You are a pirate chatbot who always responds in pirate speak!
 
@@ -387,7 +387,7 @@ You are a pirate chatbot who always responds in pirate speak!
 				},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected: `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Get weather for Paris<｜Assistant｜><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>get_weather
+			expected: `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Get weather for Paris<｜Assistant｜><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>get_weather
 ` + "```json\n" + `{"location":"Paris"}
 ` + "```" + `<｜tool▁call▁end｜><｜tool▁calls▁end｜><｜end▁of▁sentence｜><｜Assistant｜>`,
 		},
@@ -415,7 +415,7 @@ You are a pirate chatbot who always responds in pirate speak!
 				},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected: `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Process complex data<｜Assistant｜><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>process_data
+			expected: `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Process complex data<｜Assistant｜><｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>process_data
 ` + "```json\n" + `{"config":{"enabled":true,"tags":["important","urgent"],"threshold":0.95},"items":["item1","item2","item3"]}
 ` + "```" + `<｜tool▁call▁end｜><｜tool▁calls▁end｜><｜end▁of▁sentence｜><｜Assistant｜>`,
 		},
@@ -427,7 +427,7 @@ You are a pirate chatbot who always responds in pirate speak!
 				{Role: "assistant", Content: ""},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected:   `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello<｜Assistant｜><｜end▁of▁sentence｜><｜Assistant｜>`,
+			expected:   `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hello<｜Assistant｜><｜end▁of▁sentence｜><｜Assistant｜>`,
 		},
 		{
 			name: "thinking_with_empty_assistant_content",
@@ -438,7 +438,7 @@ You are a pirate chatbot who always responds in pirate speak!
 			thinkValue: &api.ThinkValue{Value: true},
 			expected: `<｜begin▁of▁sentence｜>Enable deep thinking subroutine.
 
-You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Think about this<｜Assistant｜><｜end▁of▁sentence｜><｜Assistant｜><think>
+You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Think about this<｜Assistant｜><｜end▁of▁sentence｜><｜Assistant｜><think>
 `,
 		},
 		{
@@ -449,7 +449,7 @@ You are Cogito, an AI assistant created by Deep Cogito, which is an AI research 
 				{Role: "user", Content: "Hello"},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected: `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
+			expected: `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.
 
 First instruction<｜User｜>Hello<｜Assistant｜>`,
 		},
@@ -460,7 +460,7 @@ First instruction<｜User｜>Hello<｜Assistant｜>`,
 				{Role: "assistant", Content: "They're handled normally in content."},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected:   `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>What about <|special|> tokens and "quotes"?<｜Assistant｜>They're handled normally in content.<｜end▁of▁sentence｜><｜Assistant｜>`,
+			expected:   `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>What about <|special|> tokens and "quotes"?<｜Assistant｜>They're handled normally in content.<｜end▁of▁sentence｜><｜Assistant｜>`,
 		},
 		{
 			name: "long_conversation_multiple_rounds",
@@ -472,7 +472,7 @@ First instruction<｜User｜>Hello<｜Assistant｜>`,
 				{Role: "user", Content: "What's the weather?"},
 			},
 			thinkValue: &api.ThinkValue{Value: false},
-			expected:   `<｜begin▁of▁sentence｜>You are Cogito, an AI assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hi<｜Assistant｜>Hello!<｜end▁of▁sentence｜><｜User｜>How are you?<｜Assistant｜>Good, thanks!<｜end▁of▁sentence｜><｜User｜>What's the weather?<｜Assistant｜>`,
+			expected:   `<｜begin▁of▁sentence｜>You are Mira, an assistant created by Deep Cogito, which is an AI research lab based in San Francisco.<｜User｜>Hi<｜Assistant｜>Hello!<｜end▁of▁sentence｜><｜User｜>How are you?<｜Assistant｜>Good, thanks!<｜end▁of▁sentence｜><｜User｜>What's the weather?<｜Assistant｜>`,
 		},
 	}
 
