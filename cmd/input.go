@@ -45,6 +45,9 @@ var inputCmd = &cobra.Command{
 			req := &api.ChatRequest{
 				Model:    model,
 				Messages: messages,
+				Options: map[string]interface{}{
+					"num_predict": 2048,
+				},
 			}
 
 			// We don't print the response text because the model is instructed to use the display tool.
