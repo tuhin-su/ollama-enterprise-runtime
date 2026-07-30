@@ -22,12 +22,7 @@ var inputCmd = &cobra.Command{
 		}
 		model := "default_model"
 
-		messages := []api.Message{
-			{
-				Role:    "system",
-				Content: "You must check your available tools to find a way to tell or show information to the user. You MUST NEVER output plain text to the user directly.",
-			},
-		}
+		messages := []api.Message{}
 
 		fmt.Println("Ready for input. The model will display output in the registered display tool.")
 		scanner := bufio.NewScanner(os.Stdin)

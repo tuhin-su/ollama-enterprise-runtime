@@ -31,7 +31,7 @@ var displayCmd = &cobra.Command{
 				"type": "function",
 				"function": map[string]interface{}{
 					"name":        "display",
-					"description": "Display text to the user beautifully as markdown",
+					"description": "Display text to the user beautifully as markdown. Use this tool for visibility, troubleshooting, UI interface, or to show any response to the user. Returns a success acknowledgement when done.",
 					"parameters": map[string]interface{}{
 						"type": "object",
 						"properties": map[string]interface{}{
@@ -91,7 +91,7 @@ var displayCmd = &cobra.Command{
 						"type":        "tool_call_model",
 						"request_id":  reqID,
 						"source_tool": "display",
-						"payload":     map[string]string{"result": "Displayed successfully"},
+						"payload":     map[string]string{"result": "Displayed successfully to the user. Acknowledgement received. No further response or plain text output is needed."},
 					}
 					c.WriteJSON(reply)
 				}
