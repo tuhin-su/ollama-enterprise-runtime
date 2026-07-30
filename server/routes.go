@@ -2909,7 +2909,23 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		truncate = false
 	}
 	promptOpts := optionsForPrompt(opts, r)
-	prompt, media, err := chatPrompt(c.Request.Context(), m, r.Tokenize, promptOpts, msgs, processedTools, req.Think, truncate)
+	var prompt string
+	var media []llm.MediaData
+	
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		prompt, media, err = chatPrompt(c.Request.Context(), m, r.Tokenize, promptOpts, msgs, processedTools, req.Think, truncate)
+		if err == nil {
+			break
+		}
+		
+		slog.Warn("chat prompt error, attempting failback to model", "attempt", i+1, "error", err)
+		msgs = append(msgs, api.Message{
+			Role:    "user",
+			Content: fmt.Sprintf("System Error: %v\nPlease correct your request or retry.", err),
+		})
+	}
+	
 	if err != nil {
 		slog.Error("chat prompt error", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -2940,14 +2956,28 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	go func() {
 		defer close(ch)
 
-		var runChat func(currentMessages []api.Message)
-		runChat = func(currentMessages []api.Message) {
+		var runChat func(currentMessages []api.Message, retryCount int)
+		runChat = func(currentMessages []api.Message, retryCount int) {
 			currentPrompt := prompt
 			currentMedia := media
 
 			if len(currentMessages) > len(msgs) {
 				var err error
-				currentPrompt, currentMedia, err = chatPrompt(c.Request.Context(), m, r.Tokenize, promptOpts, currentMessages, processedTools, req.Think, truncate)
+				
+				// Apply Jinja template with failback
+				maxJinjaRetries := 3
+				for i := 0; i < maxJinjaRetries; i++ {
+					currentPrompt, currentMedia, err = chatPrompt(c.Request.Context(), m, r.Tokenize, promptOpts, currentMessages, processedTools, req.Think, truncate)
+					if err == nil {
+						break
+					}
+					slog.Warn("chat prompt error in runChat, attempting failback", "attempt", i+1, "error", err)
+					currentMessages = append(currentMessages, api.Message{
+						Role:    "user",
+						Content: fmt.Sprintf("System Error: %v\nPlease correct your request or retry.", err),
+					})
+				}
+				
 				if err != nil {
 					slog.Error("chat prompt error", "error", err)
 					ch <- gin.H{"error": err.Error()}
@@ -3026,9 +3056,14 @@ func (s *Server) ChatHandler(c *gin.Context) {
 					if builtinParser != nil {
 						slog.Log(context.TODO(), logutil.LevelTrace, "builtin parser input", "parser", m.Config.Parser, "content", r.Content)
 
-						content, thinking, toolCalls, err := builtinParser.Add(r.Content, r.Done)
-						if err != nil {
-							ch <- gin.H{"error": err.Error()}
+						content, thinking, toolCalls, parserErr := builtinParser.Add(r.Content, r.Done)
+						if parserErr != nil {
+							if retryCount < 3 {
+								slog.Warn("builtin parser error, failing back to model", "error", parserErr)
+								cancel() // abort the current completion
+								return
+							}
+							ch <- gin.H{"error": parserErr.Error()}
 							return
 						}
 
@@ -3191,6 +3226,17 @@ func (s *Server) ChatHandler(c *gin.Context) {
 					if structuredOutputsState == structuredOutputsState_ReadyToApply && strings.Contains(err.Error(), "context canceled") && c.Request.Context().Err() == nil {
 						// only ignores error if it's a context cancellation due to setting structured outputs
 					} else {
+						if retryCount < 3 && !strings.Contains(err.Error(), "context canceled") {
+							slog.Warn("r.Completion error, attempting failback to model", "attempt", retryCount+1, "error", err)
+							errMessage := api.Message{
+								Role:    "user",
+								Content: fmt.Sprintf("System Error: Request generation failed with error: %v. Please adjust your request or tool usage and try again.", err),
+							}
+							currentMessages = append(currentMessages, errMessage)
+							runChat(currentMessages, retryCount+1)
+							return
+						}
+						
 						s.sched.expireRunnersForRuntimeOOM(m, err)
 						var serr api.StatusError
 						if errors.As(err, &serr) {
@@ -3280,6 +3326,14 @@ func (s *Server) ChatHandler(c *gin.Context) {
 						if b, err := json.Marshal(tc.Function.Arguments); err == nil && string(b) != "{}" && string(b) != "null" {
 							argsStr = string(b)
 						}
+						
+						// 1) Model is calling a tool: stream this to the user immediately
+						ch <- api.ChatResponse{
+							Model:     req.Model,
+							CreatedAt: time.Now().UTC(),
+							Message:   api.Message{Role: "assistant", Content: fmt.Sprintf("\n[MODEL -> %s]\n", tc.Function.Name)},
+						}
+						
 						slog.Info(fmt.Sprintf("[TOOL] %s(%s)", tc.Function.Name, argsStr))
 						resultStr, execErr = executeToolOrMemory(c.Request.Context(), s, memUID, tc)
 						if execErr == nil && tc.Function.Name == "toolmanager.search" {
@@ -3297,6 +3351,13 @@ func (s *Server) ChatHandler(c *gin.Context) {
 								}
 							}
 						}
+						
+						// 2) Tool finished, giving data back to model: stream this to the user
+						ch <- api.ChatResponse{
+							Model:     req.Model,
+							CreatedAt: time.Now().UTC(),
+							Message:   api.Message{Role: "assistant", Content: fmt.Sprintf("\n[%s -> MODEL]\n", tc.Function.Name)},
+						}
 					}
 
 					if execErr != nil {
@@ -3310,7 +3371,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 				}
 
 				// Re-run chat with the new history
-				runChat(newMessages)
+				runChat(newMessages, 0)
 				return
 			}
 
@@ -3348,7 +3409,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 			}
 		}
 
-		runChat(msgs)
+		runChat(msgs, 0)
 	}()
 
 	// --- Memory subsystem: capture reply and store new memories async ---

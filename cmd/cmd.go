@@ -1456,7 +1456,7 @@ func RunHandler(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		return generateInteractive(cmd, opts)
+		return errors.New("Interactive chat has been removed from this binary.")
 	}
 	if err := generate(cmd, opts); err != nil {
 		if handleCloudAuthorizationError(err) {
@@ -2474,12 +2474,7 @@ func generate(cmd *cobra.Command, opts runOptions) error {
 		return nil
 	}
 
-	if opts.MultiModal {
-		opts.Prompt, opts.Images, err = extractFileData(opts.Prompt)
-		if err != nil {
-			return err
-		}
-	}
+	// multimodal file extraction removed
 
 	if opts.Format == "json" {
 		opts.Format = `"` + opts.Format + `"`
@@ -2643,56 +2638,7 @@ Environment Variables:
 	cmd.SetUsageTemplate(cmd.UsageTemplate() + envUsage)
 }
 
-func launchInteractiveModel(cmd *cobra.Command, modelName string) error {
-	client, err := api.ClientFromEnvironment()
-	if err != nil {
-		return err
-	}
-
-	opts := agentTUIOptions{
-		Model:   modelName,
-		Options: map[string]any{},
-	}
-	info, err := prepareAgentModel(cmd, client, &opts, false)
-	if err != nil {
-		if handleCloudAuthorizationError(err) {
-			return nil
-		}
-		return err
-	}
-	opts.System = info.System
-
-	if err := saveLastAgentModel(opts.Model); err != nil {
-		return err
-	}
-	if err := GenerateAgentTUI(cmd, client, opts); err != nil {
-		if handleCloudAuthorizationError(err) {
-			return nil
-		}
-		return fmt.Errorf("error running agent: %w", err)
-	}
-	return nil
-}
-
-// runInteractiveTUI runs the main interactive chat session inline.
-func runInteractiveTUI(cmd *cobra.Command) {
-	// Ensure the server is running via the shared checkServerHeartbeat path.
-	if err := checkServerHeartbeat(cmd, nil); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return
-	}
-
-	opts := runOptions{
-		Model:       "",
-		WordWrap:    os.Getenv("TERM") == "xterm-256color",
-		Options:     map[string]any{},
-		ShowConnect: false,
-	}
-
-	if err := generateInteractive(cmd, opts); err != nil {
-		fmt.Fprintf(os.Stderr, "Error running agent: %v\n", err)
-	}
-}
+	// removed agent interactive mode
 
 
 
@@ -2718,7 +2664,7 @@ func NewCLI() *cobra.Command {
 				return
 			}
 
-			runInteractiveTUI(cmd)
+			cmd.Help()
 		},
 	}
 
@@ -2964,6 +2910,7 @@ func NewCLI() *cobra.Command {
 		createCmd,
 		showCmd,
 		runCmd,
+		displayCmd,
 		stopCmd,
 		pullCmd,
 		pushCmd,
@@ -3014,6 +2961,7 @@ func NewCLI() *cobra.Command {
 		createCmd,
 		showCmd,
 		runCmd,
+		displayCmd,
 		stopCmd,
 		pullCmd,
 		pushCmd,
