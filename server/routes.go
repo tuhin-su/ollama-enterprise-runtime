@@ -2852,7 +2852,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	if len(activeTools) > 0 || globalToolManager != nil {
 		sysNote := api.Message{
 			Role: "system",
-			Content: "[System: You do not have all tools loaded in your context window. If you need to perform an action (like checking memory, scheduling tasks, chaining models, or using external scripts), use the 'toolmanager.search' tool to dynamically retrieve the tool you need from the database.]",
+			Content: "[System: You do not have all tools loaded in your context window. If you need to perform an action (like checking memory, scheduling tasks, chaining models, or using external scripts), use the 'toolmanager.search' tool to dynamically retrieve the tool you need from the database. You must check your available tools to find a way to tell or show information to the user. You MUST NEVER output plain text to the user directly. When you use a display tool, it will return a success acknowledgement. Once you receive this acknowledgement, you MUST stop and give NO further output. If you do not receive an acknowledgement, it means you did something wrong.]",
 		}
 		msgs = append([]api.Message{sysNote}, msgs...)
 	}
@@ -4192,7 +4192,7 @@ func executeToolOrMemory(ctx context.Context, s *Server, memUID string, tc api.T
 		if query == "" {
 			return "", fmt.Errorf("query parameter is required")
 		}
-		results, err := globalToolManager.SearchTools(ctx, query, 3)
+		results, err := globalToolManager.SearchTools(ctx, query, 10)
 		if err != nil {
 			return "", err
 		}
