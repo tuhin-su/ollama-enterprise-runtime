@@ -1,99 +1,105 @@
 package cmd
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
+	"log"
+	"os"
+	"os/signal"
 
 	"github.com/charmbracelet/glamour"
-	"github.com/ollama/ollama/api"
+	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
 )
 
 var displayCmd = &cobra.Command{
-	Use:     "display [MODEL] [PROMPT]",
-	Short:   "Run a model in display mode with no chat interface",
-	Args:    cobra.MinimumNArgs(0),
-	PreRunE: checkServerHeartbeat,
+	Use:   "display",
+	Short: "Register the display tool and wait for data",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, err := api.ClientFromEnvironment()
+		u := "ws://127.0.0.1:11434/api/tools/interface"
+		c, _, err := websocket.DefaultDialer.Dial(u, nil)
 		if err != nil {
-			return err
+			return fmt.Errorf("dial: %v", err)
 		}
+		defer c.Close()
 
-		model := "llama3.2" // default model
-		if len(args) > 0 {
-			model = args[0]
-		}
-
-		messages := []api.Message{
-			{
-				Role:    "system",
-				Content: "You are an autonomous background agent. You do not have a direct text channel to the user. You should use your websocket-provided tools to display text or request input.",
+		authMsg := map[string]interface{}{
+			"auth_token": "abc",
+			"role":       "tool",
+			"tool_name":  "display",
+			"tool_schema": map[string]interface{}{
+				"type": "function",
+				"function": map[string]interface{}{
+					"name":        "display",
+					"description": "Display text to the user beautifully as markdown",
+					"parameters": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"data": map[string]interface{}{
+								"type":        "string",
+								"description": "The markdown text to display",
+							},
+						},
+						"required": []string{"data"},
+					},
+				},
 			},
 		}
 
-		prompt := "Hello"
-		if len(args) > 1 {
-			prompt = strings.Join(args[1:], " ")
+		if err := c.WriteJSON(authMsg); err != nil {
+			return fmt.Errorf("write auth: %v", err)
 		}
 
-		messages = append(messages, api.Message{
-			Role:    "user",
-			Content: prompt,
-		})
+		var resp map[string]interface{}
+		if err := c.ReadJSON(&resp); err != nil {
+			return fmt.Errorf("read auth response: %v", err)
+		}
+		if status, _ := resp["status"].(string); status != "authenticated" {
+			return fmt.Errorf("authentication failed: %v", resp)
+		}
 
-		for {
-			req := &api.ChatRequest{
-				Model:    model,
-				Messages: messages,
-			}
+		fmt.Println("Registered display tool. Waiting for data...")
 
-			var lastResp *api.ChatResponse
-			err = client.Chat(context.Background(), req, func(resp api.ChatResponse) error {
-				if resp.Done {
-					lastResp = &resp
-					messages = append(messages, resp.Message)
+		interrupt := make(chan os.Signal, 1)
+		signal.Notify(interrupt, os.Interrupt)
+
+		go func() {
+			for {
+				var msg map[string]interface{}
+				err := c.ReadJSON(&msg)
+				if err != nil {
+					log.Println("read error:", err)
+					return
 				}
-				return nil
-			})
-			if err != nil {
-				return err
-			}
-
-			if lastResp == nil || len(lastResp.Message.ToolCalls) == 0 {
-				break // Done with tool loop, go back to waiting for outer input
-			}
-
-			for _, tc := range lastResp.Message.ToolCalls {
-				var resultStr string
-				var args map[string]any
-				b, _ := json.Marshal(tc.Function.Arguments)
-				_ = json.Unmarshal(b, &args)
-
-				if tc.Function.Name == "display" {
-					if data, ok := args["data"].(string); ok {
-						out, err := glamour.Render(data, "dark")
-						if err == nil {
-							fmt.Print(out)
-						} else {
-							fmt.Println("\n--- DISPLAY ---")
-							fmt.Println(data)
-							fmt.Println("---------------")
+				if t, _ := msg["type"].(string); t == "execute_tool" {
+					reqID, _ := msg["request_id"].(string)
+					payload, ok := msg["payload"].(map[string]interface{})
+					if ok {
+						if data, ok := payload["data"].(string); ok {
+							out, err := glamour.Render(data, "dark")
+							if err == nil {
+								fmt.Print(out)
+							} else {
+								fmt.Println("\n--- DISPLAY ---")
+								fmt.Println(data)
+								fmt.Println("---------------")
+							}
 						}
-						resultStr = "Displayed successfully."
 					}
+					
+					reply := map[string]interface{}{
+						"type":        "tool_call_model",
+						"request_id":  reqID,
+						"source_tool": "display",
+						"payload":     map[string]string{"result": "Displayed successfully"},
+					}
+					c.WriteJSON(reply)
 				}
-
-				messages = append(messages, api.Message{
-					Role:       "tool",
-					Content:    resultStr,
-					ToolCallID: tc.ID,
-				})
 			}
-		}
+		}()
 
+		<-interrupt
+		fmt.Println("Shutting down display tool...")
 		return nil
 	},
 }
