@@ -74,8 +74,11 @@ var displayCmd = &cobra.Command{
 				if t, _ := msg["type"].(string); t == "execute_tool" {
 					reqID, _ := msg["request_id"].(string)
 					payload, ok := msg["payload"].(map[string]interface{})
+					
+					var replyPayload map[string]string
+					
 					if ok {
-						if data, ok := payload["data"].(string); ok {
+						if data, ok := payload["data"].(string); ok && data != "" {
 							out, err := glamour.Render(data, "dark")
 							if err == nil {
 								fmt.Print(out)
@@ -84,14 +87,24 @@ var displayCmd = &cobra.Command{
 								fmt.Println(data)
 								fmt.Println("---------------")
 							}
+							replyPayload = map[string]string{"result": "Displayed successfully to the user. Acknowledgement received. No further response or plain text output is needed."}
+						} else {
+							fmt.Println("\n--- DISPLAY (TOOL CALL CUT OFF / ERROR) ---")
+							fmt.Println("The model attempted to use the display tool, but the request was cut off or invalid.")
+							fmt.Println("This usually happens if the model hits its token limit before finishing the JSON.")
+							fmt.Printf("Raw Payload Received: %+v\n", payload)
+							fmt.Println("-------------------------------------------")
+							replyPayload = map[string]string{"error": "Missing 'data' argument in tool call. Your tool call was likely cut off because you hit the output limit, or it was invalid JSON. Please rectify your tool call and try again."}
 						}
+					} else {
+						replyPayload = map[string]string{"error": "Invalid payload format."}
 					}
 					
 					reply := map[string]interface{}{
 						"type":        "tool_call_model",
 						"request_id":  reqID,
 						"source_tool": "display",
-						"payload":     map[string]string{"result": "Displayed successfully to the user. Acknowledgement received. No further response or plain text output is needed."},
+						"payload":     replyPayload,
 					}
 					c.WriteJSON(reply)
 				}

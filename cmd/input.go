@@ -46,7 +46,8 @@ var inputCmd = &cobra.Command{
 				Model:    model,
 				Messages: messages,
 				Options: map[string]interface{}{
-					"num_predict": 2048,
+					"num_predict": 8192,
+					"num_ctx":     32768,
 				},
 			}
 
