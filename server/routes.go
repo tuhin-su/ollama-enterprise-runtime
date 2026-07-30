@@ -2527,13 +2527,13 @@ func (s *Server) ChatHandler(c *gin.Context) {
 
 	// Dynamically inject the ToolManager search meta-tool if there are connected tools
 	activeTools := globalToolServer.GetActiveTools()
-	if len(activeTools) > 0 {
+	if len(activeTools) > 0 || globalToolManager != nil {
 		var searchTool api.Tool
 		err := json.Unmarshal([]byte(`{
 			"type": "function",
 			"function": {
 				"name": "toolmanager.search",
-				"description": "Search the vector database for a connected tool that matches your needs.",
+				"description": "Search the vector database for a connected tool that matches your needs. Be concise. Do NOT call in parallel. If you don't find what you need in the first search, STOP searching and ask the user directly.",
 				"parameters": {
 					"type": "object",
 					"required": ["query"],
@@ -2551,25 +2551,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 			req.Tools = append(req.Tools, searchTool)
 			slog.Info("Injected toolmanager.search meta-tool into ChatRequest", "active_tools_count", len(activeTools))
 			
-			// Inject system instruction so the model knows WHY and HOW to use the search tool
-			sysNote := api.Message{
-				Role: "system",
-				Content: "[System: You do not have all tools loaded in your context window. If you need to perform an action (like checking memory, scheduling tasks, chaining models, or using external scripts), use the 'toolmanager.search' tool to dynamically retrieve the tool you need from the database.]",
-			}
-			
-			var newMsgs []api.Message
-			inserted := false
-			for _, msg := range req.Messages {
-				if msg.Role != "system" && !inserted {
-					newMsgs = append(newMsgs, sysNote)
-					inserted = true
-				}
-				newMsgs = append(newMsgs, msg)
-			}
-			if !inserted {
-				newMsgs = append(newMsgs, sysNote)
-			}
-			req.Messages = newMsgs
+			// We will inject the system instruction later into msgs so we don't override m.System.
 		}
 	}
 
@@ -2684,26 +2666,8 @@ func (s *Server) ChatHandler(c *gin.Context) {
 			}
 		}
 		
-		// Inject instruction to the model
-		sysNote := api.Message{
-			Role: "system",
-			Content: "[System: The user attached an image, but your current model architecture does not support direct image input. To process this image, you MUST use the 'chain_request' tool to delegate a subtask. You MUST set `required_capability` to 'vision' for the subtask, and provide a clear `prompt` for the vision model explaining exactly what you want it to look for. The image is stored in context and will be automatically forwarded to the vision model during tool execution.]",
-		}
-		
-		// Prepend to messages or insert after the last system message
-		var newMsgs []api.Message
-		inserted := false
-		for _, msg := range req.Messages {
-			if msg.Role != "system" && !inserted {
-				newMsgs = append(newMsgs, sysNote)
-				inserted = true
-			}
-			newMsgs = append(newMsgs, msg)
-		}
-		if !inserted {
-			newMsgs = append(newMsgs, sysNote)
-		}
-		req.Messages = newMsgs
+		// We will inject the system instruction later into msgs so we don't override m.System.
+
 		
 		// Built-in chain tools are now handled by ToolManager!
 		// We no longer blindly inject them into the prompt.
@@ -2879,10 +2843,26 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	}
 
 	msgs := append(m.Messages, req.Messages...)
-	if req.Messages[0].Role != "system" && m.System != "" {
+	if len(req.Messages) > 0 && req.Messages[0].Role != "system" && m.System != "" {
 		msgs = append([]api.Message{{Role: "system", Content: m.System}}, msgs...)
 	}
 	msgs = filterThinkTags(msgs, m)
+	
+	// Inject meta-tool system notes here so they don't interfere with m.System override logic
+	if len(activeTools) > 0 || globalToolManager != nil {
+		sysNote := api.Message{
+			Role: "system",
+			Content: "[System: You do not have all tools loaded in your context window. If you need to perform an action (like checking memory, scheduling tasks, chaining models, or using external scripts), use the 'toolmanager.search' tool to dynamically retrieve the tool you need from the database.]",
+		}
+		msgs = append([]api.Message{sysNote}, msgs...)
+	}
+	if countChatImages(req.Messages) > 0 && len(m.ProjectorPaths) == 0 {
+		sysNote := api.Message{
+			Role: "system",
+			Content: "[System: The user attached an image, but your current model architecture does not support direct image input. To process this image, you MUST use the 'chain_request' tool to delegate a subtask. You MUST set `required_capability` to 'vision' for the subtask, and provide a clear `prompt` for the vision model explaining exactly what you want it to look for. The image is stored in context and will be automatically forwarded to the vision model during tool execution.]",
+		}
+		msgs = append([]api.Message{sysNote}, msgs...)
+	}
 
 	// --- Memory subsystem: enrich messages with long-term memory context ---
 	memUID := memoryUserID(&req, c.Request.RemoteAddr)
@@ -3296,7 +3276,27 @@ func (s *Server) ChatHandler(c *gin.Context) {
 							execErr = fmt.Errorf("failed to re-acquire model after chain: %w", err)
 						}
 					} else {
+						argsStr := ""
+						if b, err := json.Marshal(tc.Function.Arguments); err == nil && string(b) != "{}" && string(b) != "null" {
+							argsStr = string(b)
+						}
+						slog.Info(fmt.Sprintf("[TOOL] %s(%s)", tc.Function.Name, argsStr))
 						resultStr, execErr = executeToolOrMemory(c.Request.Context(), s, memUID, tc)
+						if execErr == nil && tc.Function.Name == "toolmanager.search" {
+							var foundTools []api.Tool
+							if err := json.Unmarshal([]byte(resultStr), &foundTools); err == nil {
+								req.Tools = append(req.Tools, foundTools...)
+								if builtinParser != nil {
+									var lastMsg *api.Message
+									if len(currentMessages) > 0 {
+										lastMsg = &currentMessages[len(currentMessages)-1]
+									}
+									processedTools = builtinParser.Init(req.Tools, lastMsg, req.Think)
+								} else {
+									processedTools = req.Tools
+								}
+							}
+						}
 					}
 
 					if execErr != nil {
@@ -3564,7 +3564,18 @@ func (s *Server) handleNativeChat(c *gin.Context, req api.ChatRequest, m *Model,
 							execErr = fmt.Errorf("failed to re-acquire model after chain: %w", schedErr)
 						}
 					} else {
+						argsStr := ""
+						if b, err := json.Marshal(tc.Function.Arguments); err == nil && string(b) != "{}" && string(b) != "null" {
+							argsStr = string(b)
+						}
+						slog.Info(fmt.Sprintf("[TOOL] %s(%s)", tc.Function.Name, argsStr))
 						resultStr, execErr = executeToolOrMemory(c.Request.Context(), s, memUID, tc)
+						if execErr == nil && tc.Function.Name == "toolmanager.search" {
+							var foundTools []api.Tool
+							if err := json.Unmarshal([]byte(resultStr), &foundTools); err == nil {
+								nativeReq.Tools = append(nativeReq.Tools, foundTools...)
+							}
+						}
 					}
 
 					if execErr != nil {
@@ -4123,6 +4134,9 @@ func executeToolOrMemory(ctx context.Context, s *Server, memUID string, tc api.T
 		results, err := globalToolManager.SearchTools(ctx, query, 3)
 		if err != nil {
 			return "", err
+		}
+		if len(results) == 0 {
+			return `{"error": "No tools found matching your query. Stop searching for this."}`, nil
 		}
 		resBytes, _ := json.Marshal(results)
 		return string(resBytes), nil

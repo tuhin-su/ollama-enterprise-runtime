@@ -94,7 +94,7 @@ func GetMemoryTools(ctx context.Context, s *Server) api.Tools {
 			Type: "function",
 			Function: api.ToolFunction{
 				Name:        "list_memories",
-				Description: "Search, filter, or retrieve saved memories.",
+				Description: "Search, filter, or retrieve saved memories. Use this tool if you need to recall the user's name, profile, preferences, or past events.",
 				Parameters: api.ToolFunctionParameters{
 					Type:       "object",
 					Properties: listProps,
