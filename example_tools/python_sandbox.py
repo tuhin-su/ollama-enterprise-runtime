@@ -18,7 +18,7 @@ tool_schema = {
     "type": "function",
     "function": {
         "name": "python_sandbox",
-        "description": "Execute a block of Python code in a local subprocess and return stdout, stderr, and exit code. Best for running tests, calculations, and data processing.",
+        "description": "Execute a block of Python code in a local subprocess and return stdout, stderr, and exit code. Best for running tests, calculations, and data processing. You can install packages via pip using subprocess (e.g. subprocess.run([sys.executable, '-m', 'pip', 'install', '<pkg>'])).",
         "parameters": {
             "type": "object",
             "properties": {
@@ -86,6 +86,7 @@ async def main():
                         code = payload.get("code", "")
                         
                         logger.info(f"Executing request {req_id}")
+                        logger.info(f"Model wants to run the following code:\n{code}")
                         try:
                             result = execute_code(code)
                             response_payload = {"status": "success", "result": result}
