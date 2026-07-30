@@ -35,7 +35,7 @@ var inputCmd = &cobra.Command{
 			},
 		}
 
-		fmt.Println("Listening for input on stdin (Display Mode)...")
+		fmt.Println("Listening for input on stdin (Input Mode)...")
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
 			text := scanner.Text()

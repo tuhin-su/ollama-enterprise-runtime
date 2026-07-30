@@ -2962,6 +2962,7 @@ func NewCLI() *cobra.Command {
 		showCmd,
 		runCmd,
 		displayCmd,
+		inputCmd,
 		stopCmd,
 		pullCmd,
 		pushCmd,
