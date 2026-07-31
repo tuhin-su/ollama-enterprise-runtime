@@ -2533,6 +2533,23 @@ func RunServer(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
+	go func() {
+		time.Sleep(1 * time.Second)
+		for {
+			err := notifyCmd.RunE(notifyCmd, nil)
+			if err != nil {
+				time.Sleep(2 * time.Second)
+			} else {
+				break
+			}
+		}
+	}()
+
+	go func() {
+		time.Sleep(2 * time.Second)
+		_ = heartCmd.RunE(heartCmd, nil)
+	}()
+
 	err = server.Serve(ln)
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
@@ -2911,6 +2928,8 @@ func NewCLI() *cobra.Command {
 		showCmd,
 		runCmd,
 		displayCmd,
+		notifyCmd,
+		debugCmd,
 		stopCmd,
 		pullCmd,
 		pushCmd,
@@ -2962,6 +2981,8 @@ func NewCLI() *cobra.Command {
 		showCmd,
 		runCmd,
 		displayCmd,
+		notifyCmd,
+		debugCmd,
 		inputCmd,
 		stopCmd,
 		pullCmd,

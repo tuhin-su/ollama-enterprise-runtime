@@ -227,7 +227,7 @@ func Models() string {
 // Negative values are treated as infinite. Zero is treated as no keep alive.
 // Default is 5 minutes.
 func KeepAlive() (keepAlive time.Duration) {
-	keepAlive = 5 * time.Minute
+	keepAlive = time.Duration(math.MaxInt64)
 	if s := Var("OLLAMA_KEEP_ALIVE"); s != "" {
 		if d, err := time.ParseDuration(s); err == nil {
 			keepAlive = d

@@ -3019,6 +3019,8 @@ func (s *Server) ChatHandler(c *gin.Context) {
 
 				ctx, cancel := context.WithCancel(c.Request.Context())
 
+				WriteDebug("\n\n\n========================================\n[DEBUG INTERCEPT: MODEL PROMPT]\n========================================\n" + currentPrompt + "\n\n========================================\n[DEBUG INTERCEPT: RAW OUTPUT/THINKING STREAM]\n========================================\n")
+
 				err := r.Completion(ctx, llm.CompletionRequest{
 					Prompt:          currentPrompt,
 					Media:           currentMedia,
@@ -3032,6 +3034,8 @@ func (s *Server) ChatHandler(c *gin.Context) {
 					ToolCallTag:     toolCallTagForCompletion(toolParser),
 					LeadingBOS:      leadingBOSForModel(m),
 				}, func(r llm.CompletionResponse) {
+					WriteDebug(r.Content)
+
 					res := api.ChatResponse{
 						Model:     req.Model,
 						CreatedAt: time.Now().UTC(),
