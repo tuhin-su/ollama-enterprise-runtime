@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/loom/loom/api"
+	"github.com/loom/loom/server/memory"
 )
 
 var heartCmd = &cobra.Command{
