@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	fsgguf "github.com/ollama/ollama/fs/gguf"
+	fsgguf "github.com/loom/loom/fs/gguf"
 )
 
 func TestWriteGGUF(t *testing.T) {

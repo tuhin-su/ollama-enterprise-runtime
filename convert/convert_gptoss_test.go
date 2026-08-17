@@ -43,7 +43,7 @@ func TestGptOssCreatesLlamaCppMetadataAndNames(t *testing.T) {
 		}
 	}
 	if _, ok := kv["gptoss.context_length"]; ok {
-		t.Fatal("unexpected Ollama-format gptoss metadata")
+		t.Fatal("unexpected Loom-format gptoss metadata")
 	}
 
 	replacer := strings.NewReplacer(m.Replacements()...)

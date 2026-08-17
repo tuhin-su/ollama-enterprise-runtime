@@ -10,7 +10,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}=== Ollama Build & Install Script ===${NC}"
+echo -e "${BLUE}=== Loom Build & Install Script ===${NC}"
 
 # Detect go environment
 if ! command -v go &> /dev/null; then
@@ -49,32 +49,32 @@ else
     echo -e "${GREEN}LanceDB native artifacts already present.${NC}"
 fi
 
-# 2. Build Ollama binary
-echo -e "${BLUE}Building Ollama with LanceDB storage engine...${NC}"
+# 2. Build Loom binary
+echo -e "${BLUE}Building Loom with LanceDB storage engine...${NC}"
 ROOT_DIR=$(pwd)
 
 export CGO_CFLAGS="-I$ROOT_DIR/include"
 export CGO_LDFLAGS="$ROOT_DIR/lib/linux_amd64/liblancedb_go.a -lm -ldl -lpthread"
 
-go build -o ollama .
+go build -o loom .
 
-echo -e "${GREEN}Build successful: Binary compiled at $ROOT_DIR/ollama${NC}"
+echo -e "${GREEN}Build successful: Binary compiled at $ROOT_DIR/loom${NC}"
 
-# 3. Install Ollama binary
+# 3. Install Loom binary
 INSTALL_DIR="/usr/local/bin"
 
-echo -e "${BLUE}Installing ollama binary to $INSTALL_DIR...${NC}"
+echo -e "${BLUE}Installing loom binary to $INSTALL_DIR...${NC}"
 if [ -w "$INSTALL_DIR" ]; then
-    cp ollama "$INSTALL_DIR/ollama"
-    echo -e "${GREEN}Success! ollama has been installed to $INSTALL_DIR/ollama${NC}"
+    cp loom "$INSTALL_DIR/loom"
+    echo -e "${GREEN}Success! loom has been installed to $INSTALL_DIR/loom${NC}"
 else
     echo -e "${YELLOW}Notice: Write permission denied to $INSTALL_DIR. Trying with sudo...${NC}"
     if command -v sudo &> /dev/null; then
-        sudo cp ollama "$INSTALL_DIR/ollama"
-        echo -e "${GREEN}Success! ollama has been installed to $INSTALL_DIR/ollama using sudo.${NC}"
+        sudo cp loom "$INSTALL_DIR/loom"
+        echo -e "${GREEN}Success! loom has been installed to $INSTALL_DIR/loom using sudo.${NC}"
     else
         echo -e "${RED}Error: Could not write to $INSTALL_DIR and 'sudo' is not available.${NC}"
-        echo -e "${YELLOW}Please manually copy the 'ollama' binary to your path, e.g.:${NC}"
-        echo -e "  cp ollama ~/.local/bin/ollama"
+        echo -e "${YELLOW}Please manually copy the 'loom' binary to your path, e.g.:${NC}"
+        echo -e "  cp loom ~/.local/bin/loom"
     fi
 fi

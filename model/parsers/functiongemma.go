@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 type FunctionGemmaParserState int

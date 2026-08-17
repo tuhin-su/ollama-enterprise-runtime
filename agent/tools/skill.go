@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ollama/ollama/agent"
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/agent"
+	"github.com/loom/loom/api"
 )
 
 // Skill is the model-facing adapter for the core agent skill catalog.
@@ -18,7 +18,7 @@ type Skill struct{ Catalog *agent.SkillCatalog }
 func (t *Skill) Name() string { return "skill" }
 
 func (t *Skill) Description() string {
-	return "Load a named Ollama skill and return its instructions."
+	return "Load a named Loom skill and return its instructions."
 }
 
 func (t *Skill) Schema() api.ToolFunction {
@@ -41,13 +41,13 @@ func (t *Skill) Execute(_ context.Context, _ agent.ToolContext, args map[string]
 	return agent.ToolResult{Content: skill.Content()}, nil
 }
 
-// SaveSkill is the model-facing adapter to create or update an Ollama skill.
+// SaveSkill is the model-facing adapter to create or update an Loom skill.
 type SaveSkill struct{ Catalog *agent.SkillCatalog }
 
 func (t *SaveSkill) Name() string { return "save_skill" }
 
 func (t *SaveSkill) Description() string {
-	return "Create or update a named Ollama skill by writing its contents to the catalog."
+	return "Create or update a named Loom skill by writing its contents to the catalog."
 }
 
 func (t *SaveSkill) Schema() api.ToolFunction {

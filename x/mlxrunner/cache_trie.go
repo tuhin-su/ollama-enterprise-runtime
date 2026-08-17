@@ -5,7 +5,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/ollama/ollama/x/mlxrunner/cache"
+	"github.com/loom/loom/x/mlxrunner/cache"
 )
 
 // trieKey encodes a token for trie matching (see prefixCache.key).

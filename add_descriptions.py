@@ -10,18 +10,18 @@ models = {
 }
 
 env = os.environ.copy()
-env["OLLAMA_MODELS"] = "/home/master/.ollama/models"
+env["LOOM_MODELS"] = "/home/master/.loom/models"
 
 for model, desc in models.items():
     print(f"Updating {model}...")
     try:
-        modelfile_output = subprocess.check_output(["./ollama", "show", model, "--modelfile"], env=env, text=True)
+        modelfile_output = subprocess.check_output(["./loom", "show", model, "--modelfile"], env=env, text=True)
         modelfile_path = f"Modelfile_{model.replace(':', '_')}"
         with open(modelfile_path, "w") as f:
             f.write(modelfile_output)
             f.write(f'\nDESCRIPTION "{desc}"\n')
         
-        subprocess.check_call(["./ollama", "create", model, "-f", modelfile_path], env=env)
+        subprocess.check_call(["./loom", "create", model, "-f", modelfile_path], env=env)
         os.remove(modelfile_path)
         print(f"Successfully updated {model}")
     except Exception as e:

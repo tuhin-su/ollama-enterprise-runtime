@@ -10,14 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ollama/ollama/fs/ggml"
-	"github.com/ollama/ollama/manifest"
-	"github.com/ollama/ollama/template"
-	"github.com/ollama/ollama/types/model"
+	"github.com/loom/loom/fs/ggml"
+	"github.com/loom/loom/manifest"
+	"github.com/loom/loom/template"
+	"github.com/loom/loom/types/model"
 )
 
 func TestPruneLayersSkipsRecentOrphans(t *testing.T) {
-	t.Setenv("OLLAMA_MODELS", t.TempDir())
+	t.Setenv("LOOM_MODELS", t.TempDir())
 
 	recentDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000001"
 	oldDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000002"
@@ -61,8 +61,8 @@ func TestGetModelTemplateMetadata(t *testing.T) {
 	customTemplate := "CUSTOM {{ .Prompt }}"
 
 	t.Run("records chat template and Go TEMPLATE layer", func(t *testing.T) {
-		t.Setenv("OLLAMA_MODELS", t.TempDir())
-		t.Setenv("OLLAMA_GO_TEMPLATE", "")
+		t.Setenv("LOOM_MODELS", t.TempDir())
+		t.Setenv("LOOM_GO_TEMPLATE", "")
 
 		_, digest := createBinFile(t, ggml.KV{
 			"general.architecture":    "llama",
@@ -86,8 +86,8 @@ func TestGetModelTemplateMetadata(t *testing.T) {
 	})
 
 	t.Run("prefers chat template when Go TEMPLATE has fewer capabilities", func(t *testing.T) {
-		t.Setenv("OLLAMA_MODELS", t.TempDir())
-		t.Setenv("OLLAMA_GO_TEMPLATE", "")
+		t.Setenv("LOOM_MODELS", t.TempDir())
+		t.Setenv("LOOM_GO_TEMPLATE", "")
 
 		_, digest := createBinFile(t, ggml.KV{
 			"general.architecture":    "llama",
@@ -108,8 +108,8 @@ func TestGetModelTemplateMetadata(t *testing.T) {
 	})
 
 	t.Run("prefers Qwen chat template with tools and inferred thinking", func(t *testing.T) {
-		t.Setenv("OLLAMA_MODELS", t.TempDir())
-		t.Setenv("OLLAMA_GO_TEMPLATE", "")
+		t.Setenv("LOOM_MODELS", t.TempDir())
+		t.Setenv("LOOM_GO_TEMPLATE", "")
 
 		_, digest := createBinFile(t, ggml.KV{
 			"general.architecture":    "llama",
@@ -133,8 +133,8 @@ func TestGetModelTemplateMetadata(t *testing.T) {
 	})
 
 	t.Run("prefers chat template with stronger tool round trip", func(t *testing.T) {
-		t.Setenv("OLLAMA_MODELS", t.TempDir())
-		t.Setenv("OLLAMA_GO_TEMPLATE", "")
+		t.Setenv("LOOM_MODELS", t.TempDir())
+		t.Setenv("LOOM_GO_TEMPLATE", "")
 
 		_, digest := createBinFile(t, ggml.KV{
 			"general.architecture": "llama",
@@ -164,8 +164,8 @@ func TestGetModelTemplateMetadata(t *testing.T) {
 	})
 
 	t.Run("keeps Go TEMPLATE when chat template has weaker tool support", func(t *testing.T) {
-		t.Setenv("OLLAMA_MODELS", t.TempDir())
-		t.Setenv("OLLAMA_GO_TEMPLATE", "")
+		t.Setenv("LOOM_MODELS", t.TempDir())
+		t.Setenv("LOOM_GO_TEMPLATE", "")
 
 		_, digest := createBinFile(t, ggml.KV{
 			"general.architecture": "llama",
@@ -202,8 +202,8 @@ func TestGetModelTemplateMetadata(t *testing.T) {
 	})
 
 	t.Run("respects explicit Go TEMPLATE enablement", func(t *testing.T) {
-		t.Setenv("OLLAMA_MODELS", t.TempDir())
-		t.Setenv("OLLAMA_GO_TEMPLATE", "1")
+		t.Setenv("LOOM_MODELS", t.TempDir())
+		t.Setenv("LOOM_GO_TEMPLATE", "1")
 
 		_, digest := createBinFile(t, ggml.KV{
 			"general.architecture":    "llama",
@@ -224,8 +224,8 @@ func TestGetModelTemplateMetadata(t *testing.T) {
 	})
 
 	t.Run("respects explicit Go TEMPLATE disablement", func(t *testing.T) {
-		t.Setenv("OLLAMA_MODELS", t.TempDir())
-		t.Setenv("OLLAMA_GO_TEMPLATE", "0")
+		t.Setenv("LOOM_MODELS", t.TempDir())
+		t.Setenv("LOOM_GO_TEMPLATE", "0")
 
 		_, digest := createBinFile(t, ggml.KV{
 			"general.architecture":    "llama",
@@ -246,8 +246,8 @@ func TestGetModelTemplateMetadata(t *testing.T) {
 	})
 
 	t.Run("records missing chat template", func(t *testing.T) {
-		t.Setenv("OLLAMA_MODELS", t.TempDir())
-		t.Setenv("OLLAMA_GO_TEMPLATE", "")
+		t.Setenv("LOOM_MODELS", t.TempDir())
+		t.Setenv("LOOM_GO_TEMPLATE", "")
 
 		_, digest := createBinFile(t, ggml.KV{
 			"general.architecture": "llama",
@@ -270,11 +270,11 @@ func TestGetModelTemplateMetadata(t *testing.T) {
 func writeTestModelManifest(t *testing.T, name, digest, tmpl string) {
 	t.Helper()
 
-	modelLayer, err := manifest.NewLayerFromLayer(digest, "application/vnd.ollama.image.model", "")
+	modelLayer, err := manifest.NewLayerFromLayer(digest, "application/vnd.loom.image.model", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	templateLayer, err := manifest.NewLayer(strings.NewReader(tmpl), "application/vnd.ollama.image.template")
+	templateLayer, err := manifest.NewLayer(strings.NewReader(tmpl), "application/vnd.loom.image.template")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -733,12 +733,12 @@ func TestPullModelManifest(t *testing.T) {
 			name: "pretty printed",
 			manifest: `{  "schemaVersion": 2,  "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
   "config": { "digest": "sha256:abc", "mediaType": "application/vnd.docker.container.image.v1+json", "size": 50 },
-  "layers": [{ "digest": "sha256:t1", "mediaType": "application/vnd.ollama.image.tensor", "size": 1024, "name": "model.weight" }]
+  "layers": [{ "digest": "sha256:t1", "mediaType": "application/vnd.loom.image.tensor", "size": 1024, "name": "model.weight" }]
 }`,
 		},
 		{
 			name:     "non-standard field order",
-			manifest: `{"layers":[{"size":999,"digest":"sha256:def","mediaType":"application/vnd.ollama.image.model"}],"schemaVersion":2,"config":{"size":50,"digest":"sha256:abc","mediaType":"application/vnd.docker.container.image.v1+json"},"mediaType":"application/vnd.docker.distribution.manifest.v2+json"}`,
+			manifest: `{"layers":[{"size":999,"digest":"sha256:def","mediaType":"application/vnd.loom.image.model"}],"schemaVersion":2,"config":{"size":50,"digest":"sha256:abc","mediaType":"application/vnd.docker.container.image.v1+json"},"mediaType":"application/vnd.docker.distribution.manifest.v2+json"}`,
 		},
 	}
 

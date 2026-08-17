@@ -10,13 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/x/mlxrunner/batch"
-	"github.com/ollama/ollama/x/mlxrunner/cache"
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
-	"github.com/ollama/ollama/x/mlxrunner/model/base"
-	sampler "github.com/ollama/ollama/x/mlxrunner/sample"
-	"github.com/ollama/ollama/x/tokenizer"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/x/mlxrunner/batch"
+	"github.com/loom/loom/x/mlxrunner/cache"
+	"github.com/loom/loom/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/mlxrunner/model/base"
+	sampler "github.com/loom/loom/x/mlxrunner/sample"
+	"github.com/loom/loom/x/tokenizer"
 )
 
 // skipIfNoMLX skips a test that exercises native MLX when the dynamic library

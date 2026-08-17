@@ -19,7 +19,7 @@
       "binaryDir": "${sourceDir}/../../build/llama-server-cpu",
       "cacheVariables": {
         "GGML_CPU_ALL_VARIANTS": "ON",
-        "OLLAMA_RUNNER_DIR": ""
+        "LOOM_RUNNER_DIR": ""
       }
     },
     {
@@ -36,8 +36,8 @@
       "toolchainFile": "${sourceDir}/../../cmake/windows-arm64-llvm-mingw.cmake",
       "cacheVariables": {
         "GGML_CPU_ALL_VARIANTS": "OFF",
-        "OLLAMA_RUNNER_DIR": "",
-        "OLLAMA_WINDOWS_RUNTIME_ARCH": "arm64"
+        "LOOM_RUNNER_DIR": "",
+        "LOOM_WINDOWS_RUNTIME_ARCH": "arm64"
       }
     },
     {
@@ -49,7 +49,7 @@
         "GGML_BACKEND_DL": "OFF",
         "GGML_METAL": "ON",
         "GGML_METAL_EMBED_LIBRARY": "ON",
-        "OLLAMA_RUNNER_DIR": ""
+        "LOOM_RUNNER_DIR": ""
       }
     },
     {
@@ -59,8 +59,8 @@
       "cacheVariables": {
         "GGML_CUDA": "ON",
         "CMAKE_CUDA_FLAGS": "-Wno-deprecated-gpu-targets -t 2",
-        "OLLAMA_RUNNER_DIR": "cuda_v12",
-        "OLLAMA_GPU_BACKEND": "cuda"
+        "LOOM_RUNNER_DIR": "cuda_v12",
+        "LOOM_GPU_BACKEND": "cuda"
       }
     },
     {
@@ -91,8 +91,8 @@
       "cacheVariables": {
         "GGML_CUDA": "ON",
         "CMAKE_CUDA_FLAGS": "-t 4",
-        "OLLAMA_RUNNER_DIR": "cuda_v13",
-        "OLLAMA_GPU_BACKEND": "cuda"
+        "LOOM_RUNNER_DIR": "cuda_v13",
+        "LOOM_GPU_BACKEND": "cuda"
       }
     },
     {
@@ -119,7 +119,7 @@
         "CMAKE_CUDA_ARCHITECTURES": "121",
         "GGML_CPU": "OFF",
         "CMAKE_CUDA_FLAGS": "-target-dir=arm64 -t 4",
-        "OLLAMA_WINDOWS_RUNTIME_ARCH": "arm64"
+        "LOOM_WINDOWS_RUNTIME_ARCH": "arm64"
       }
     },
     {
@@ -133,8 +133,8 @@
       "inherits": ["default"],
       "cacheVariables": {
         "GGML_CUDA": "ON",
-        "OLLAMA_RUNNER_DIR": "cuda_jetpack5",
-        "OLLAMA_GPU_BACKEND": "cuda"
+        "LOOM_RUNNER_DIR": "cuda_jetpack5",
+        "LOOM_GPU_BACKEND": "cuda"
       }
     },
     {
@@ -156,8 +156,8 @@
       "inherits": ["default"],
       "cacheVariables": {
         "GGML_CUDA": "ON",
-        "OLLAMA_RUNNER_DIR": "cuda_jetpack6",
-        "OLLAMA_GPU_BACKEND": "cuda"
+        "LOOM_RUNNER_DIR": "cuda_jetpack6",
+        "LOOM_GPU_BACKEND": "cuda"
       }
     },
     {
@@ -180,8 +180,8 @@
       "cacheVariables": {
         "GGML_HIP": "ON",
         "CMAKE_HIP_PLATFORM": "amd",
-        "OLLAMA_RUNNER_DIR": "rocm_v7_1",
-        "OLLAMA_GPU_BACKEND": "hip"
+        "LOOM_RUNNER_DIR": "rocm_v7_1",
+        "LOOM_GPU_BACKEND": "hip"
       }
     },
     {
@@ -204,8 +204,8 @@
       "cacheVariables": {
         "GGML_HIP": "ON",
         "CMAKE_HIP_PLATFORM": "amd",
-        "OLLAMA_RUNNER_DIR": "rocm_v7_2",
-        "OLLAMA_GPU_BACKEND": "hip"
+        "LOOM_RUNNER_DIR": "rocm_v7_2",
+        "LOOM_GPU_BACKEND": "hip"
       }
     },
     {
@@ -227,8 +227,8 @@
       "binaryDir": "${sourceDir}/../../build/llama-server-vulkan",
       "cacheVariables": {
         "GGML_VULKAN": "ON",
-        "OLLAMA_RUNNER_DIR": "vulkan",
-        "OLLAMA_GPU_BACKEND": "vulkan"
+        "LOOM_RUNNER_DIR": "vulkan",
+        "LOOM_GPU_BACKEND": "vulkan"
       }
     }
   ],

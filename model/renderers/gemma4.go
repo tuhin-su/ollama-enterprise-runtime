@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 // Gemma4Renderer renders prompts using Gemma 4's chat format with

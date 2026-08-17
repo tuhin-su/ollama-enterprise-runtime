@@ -16,11 +16,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/envconfig"
-	internalcloud "github.com/ollama/ollama/internal/cloud"
-	"github.com/ollama/ollama/manifest"
-	modelpkg "github.com/ollama/ollama/types/model"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/envconfig"
+	internalcloud "github.com/loom/loom/internal/cloud"
+	"github.com/loom/loom/manifest"
+	modelpkg "github.com/loom/loom/types/model"
 )
 
 func TestModelShowCacheLocalHitUsesManifestDigest(t *testing.T) {
@@ -151,7 +151,7 @@ func TestModelShowCacheLocalHydrationSkipsUnchangedInMemory(t *testing.T) {
 func TestModelShowCacheStartupSkipsLocalHydration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	setTestHome(t, t.TempDir())
-	t.Setenv("OLLAMA_NO_CLOUD", "1")
+	t.Setenv("LOOM_NO_CLOUD", "1")
 	createShowCacheModel(t, "show-cache-startup", map[string]any{"test.context_length": uint32(1024)})
 
 	cache := newModelShowCache()
@@ -438,7 +438,7 @@ func TestModelShowCacheCloudDisabledDoesNotServeStale(t *testing.T) {
 	setTestHome(t, t.TempDir())
 
 	t.Cleanup(envconfig.ReloadServerConfig)
-	t.Setenv("OLLAMA_NO_CLOUD", "1")
+	t.Setenv("LOOM_NO_CLOUD", "1")
 	envconfig.ReloadServerConfig()
 
 	cache := newModelShowCache()
@@ -485,7 +485,7 @@ func changeShowCacheManifest(t *testing.T, name string) {
 	if err != nil {
 		t.Fatalf("parse manifest: %v", err)
 	}
-	layer, err := manifest.NewLayer(strings.NewReader("changed"), "application/vnd.ollama.image.system")
+	layer, err := manifest.NewLayer(strings.NewReader("changed"), "application/vnd.loom.image.system")
 	if err != nil {
 		t.Fatalf("new layer: %v", err)
 	}

@@ -11,7 +11,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/ollama/ollama/fs/ggml"
+	"github.com/loom/loom/fs/ggml"
 )
 
 func TestConvertEmbeddingGemmaSentenceTransformers(t *testing.T) {

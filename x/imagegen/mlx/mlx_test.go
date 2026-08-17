@@ -11,7 +11,7 @@ import (
 // TestMain initializes MLX before running tests.
 // If MLX libraries are not available, tests are skipped.
 func TestMain(m *testing.M) {
-	// Change to repo root so ./build/lib/ollama/ path works
+	// Change to repo root so ./build/lib/loom/ path works
 	_, thisFile, _, _ := runtime.Caller(0)
 	repoRoot := filepath.Join(filepath.Dir(thisFile), "..", "..", "..")
 	if err := os.Chdir(repoRoot); err != nil {

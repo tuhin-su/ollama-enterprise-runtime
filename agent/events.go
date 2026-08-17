@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 type EventType string

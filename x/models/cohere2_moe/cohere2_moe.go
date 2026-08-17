@@ -19,13 +19,13 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/ollama/ollama/x/mlxrunner/batch"
-	"github.com/ollama/ollama/x/mlxrunner/cache"
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
-	"github.com/ollama/ollama/x/mlxrunner/model"
-	"github.com/ollama/ollama/x/mlxrunner/model/base"
-	"github.com/ollama/ollama/x/models/nn"
-	"github.com/ollama/ollama/x/tokenizer"
+	"github.com/loom/loom/x/mlxrunner/batch"
+	"github.com/loom/loom/x/mlxrunner/cache"
+	"github.com/loom/loom/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/mlxrunner/model"
+	"github.com/loom/loom/x/mlxrunner/model/base"
+	"github.com/loom/loom/x/models/nn"
+	"github.com/loom/loom/x/tokenizer"
 )
 
 func init() {
@@ -408,7 +408,7 @@ func transposeExpertWeightForGatherMM(w *mlx.Array) *mlx.Array {
 }
 
 // loadStackedProjection returns expert weights already stacked as a single 3D
-// tensor (layers.N.mlp.switch_mlp.<proj>.weight) — the layout `ollama create`
+// tensor (layers.N.mlp.switch_mlp.<proj>.weight) — the layout `loom create`
 // writes when it packs per-expert tensors at import.
 func loadStackedProjection(tensors map[string]*mlx.Array, cfg *Config, useQuantized bool, base string) *stackedExpertWeights {
 	key := base + ".weight"
@@ -447,7 +447,7 @@ func loadStackedProjection(tensors map[string]*mlx.Array, cfg *Config, useQuanti
 }
 
 // loadStackedExperts resolves a stacked expert projection by its close-to-source
-// name (layers.N.mlp.experts.<proj>, which `ollama create` now writes) and falls
+// name (layers.N.mlp.experts.<proj>, which `loom create` now writes) and falls
 // back to the legacy switch_mlp name that older imports produced.
 func loadStackedExperts(tensors map[string]*mlx.Array, cfg *Config, useQuantized bool, layerPrefix, proj string) *stackedExpertWeights {
 	if w := loadStackedProjection(tensors, cfg, useQuantized, layerPrefix+".mlp.experts."+proj); w != nil {
@@ -541,7 +541,7 @@ func (m *Model) LoadWeights(tensors map[string]*mlx.Array) error {
 			upW := loadStackedExperts(tensors, cfg, useQuantizedExperts, layerPrefix, "up_proj")
 			downW := loadStackedExperts(tensors, cfg, useQuantizedExperts, layerPrefix, "down_proj")
 			if gateW == nil || upW == nil || downW == nil {
-				return fmt.Errorf("layer %d: missing stacked expert weights (import the model with `ollama create`)", i)
+				return fmt.Errorf("layer %d: missing stacked expert weights (import the model with `loom create`)", i)
 			}
 
 			switchMLP := &SwitchMLP{}

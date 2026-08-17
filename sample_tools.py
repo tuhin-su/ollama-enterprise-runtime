@@ -6,12 +6,12 @@ import websockets
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-OLLAMA_WS_URL = "ws://localhost:11434/api/tools/interface"
+LOOM_WS_URL = "ws://localhost:11434/api/tools/interface"
 AUTH_TOKEN = "abc"
 
 async def tool_runner(tool_name: str, handler, schema: dict):
-    """Generic runner for a tool connecting to the Ollama websocket."""
-    async with websockets.connect(OLLAMA_WS_URL) as websocket:
+    """Generic runner for a tool connecting to the Loom websocket."""
+    async with websockets.connect(LOOM_WS_URL) as websocket:
         # 1. Authenticate with Priority for Queueing
         auth_msg = {
             "auth_token": AUTH_TOKEN,

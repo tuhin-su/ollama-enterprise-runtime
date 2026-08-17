@@ -10,17 +10,17 @@ import (
 	"strings"
 	"testing"
 
-	coreagent "github.com/ollama/ollama/agent"
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/envconfig"
-	internalcloud "github.com/ollama/ollama/internal/cloud"
+	coreagent "github.com/loom/loom/agent"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/envconfig"
+	internalcloud "github.com/loom/loom/internal/cloud"
 )
 
 func TestWebToolsRequireApproval(t *testing.T) {
-	if !coreagent.ToolRequiresApproval((&WebSearch{}), map[string]any{"query": "ollama"}) {
+	if !coreagent.ToolRequiresApproval((&WebSearch{}), map[string]any{"query": "loom"}) {
 		t.Fatal("web search should require approval")
 	}
-	if !coreagent.ToolRequiresApproval((&WebFetch{}), map[string]any{"url": "https://ollama.com"}) {
+	if !coreagent.ToolRequiresApproval((&WebFetch{}), map[string]any{"url": "https://loom.com"}) {
 		t.Fatal("web fetch should require approval")
 	}
 }
@@ -32,12 +32,12 @@ var webToolCases = []struct {
 	path      string
 	operation string
 }{
-	{"search", &WebSearch{}, map[string]any{"query": "ollama"}, "/api/experimental/web_search", "web search is unavailable"},
-	{"fetch", &WebFetch{}, map[string]any{"url": "https://ollama.com"}, "/api/experimental/web_fetch", "web fetch is unavailable"},
+	{"search", &WebSearch{}, map[string]any{"query": "loom"}, "/api/experimental/web_search", "web search is unavailable"},
+	{"fetch", &WebFetch{}, map[string]any{"url": "https://loom.com"}, "/api/experimental/web_fetch", "web fetch is unavailable"},
 }
 
 // enableWebToolsForTest isolates web tool tests from the runner's cloud
-// policy. In particular, Windows can inherit both OLLAMA_NO_CLOUD and a
+// policy. In particular, Windows can inherit both LOOM_NO_CLOUD and a
 // server.json from USERPROFILE.
 func enableWebToolsForTest(t *testing.T) {
 	t.Helper()
@@ -49,7 +49,7 @@ func enableWebToolsForTest(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	t.Setenv("OLLAMA_NO_CLOUD", "")
+	t.Setenv("LOOM_NO_CLOUD", "")
 	envconfig.ReloadServerConfig()
 }
 
@@ -66,7 +66,7 @@ func runWebTool(t *testing.T, tool coreagent.Tool, args map[string]any, path str
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(ts.Close)
-	t.Setenv("OLLAMA_HOST", ts.URL)
+	t.Setenv("LOOM_HOST", ts.URL)
 	_, err := tool.Execute(t.Context(), coreagent.ToolContext{}, args)
 	return err
 }
@@ -77,7 +77,7 @@ func TestWebToolsReportAuthenticationError(t *testing.T) {
 	for _, tt := range webToolCases {
 		t.Run(tt.name, func(t *testing.T) {
 			err := runWebTool(t, tt.tool, tt.args, tt.path, http.StatusUnauthorized,
-				`{"error":"unauthorized","signin_url":"https://ollama.com/signin"}`)
+				`{"error":"unauthorized","signin_url":"https://loom.com/signin"}`)
 			if !errors.Is(err, ErrWebAuthRequired) {
 				t.Fatalf("error = %v, want %v", err, ErrWebAuthRequired)
 			}
@@ -108,21 +108,21 @@ func TestWebToolsIgnoreInheritedCloudPolicy(t *testing.T) {
 	t.Cleanup(envconfig.ReloadServerConfig)
 
 	home := t.TempDir()
-	configPath := filepath.Join(home, ".ollama", "server.json")
+	configPath := filepath.Join(home, ".loom", "server.json")
 	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(configPath, []byte(`{"disable_ollama_cloud":true}`), 0o644); err != nil {
+	if err := os.WriteFile(configPath, []byte(`{"disable_loom_cloud":true}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	t.Setenv("OLLAMA_NO_CLOUD", "1")
+	t.Setenv("LOOM_NO_CLOUD", "1")
 	envconfig.ReloadServerConfig()
 
 	enableWebToolsForTest(t)
-	err := runWebTool(t, &WebSearch{}, map[string]any{"query": "ollama"}, "/api/experimental/web_search", http.StatusUnauthorized,
-		`{"error":"unauthorized","signin_url":"https://ollama.com/signin"}`)
+	err := runWebTool(t, &WebSearch{}, map[string]any{"query": "loom"}, "/api/experimental/web_search", http.StatusUnauthorized,
+		`{"error":"unauthorized","signin_url":"https://loom.com/signin"}`)
 	if !errors.Is(err, ErrWebAuthRequired) {
 		t.Fatalf("error = %v, want %v", err, ErrWebAuthRequired)
 	}
@@ -170,21 +170,21 @@ func TestWebFetchBoundsContentBeforeReturning(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatal(err)
 		}
-		if req.URL != "https://ollama.com" {
-			t.Fatalf("request URL = %q, want https://ollama.com", req.URL)
+		if req.URL != "https://loom.com" {
+			t.Fatalf("request URL = %q, want https://loom.com", req.URL)
 		}
 		if err := json.NewEncoder(w).Encode(api.WebFetchResponse{
-			Title:   "Ollama",
+			Title:   "Loom",
 			Content: strings.Repeat("x", maxWebFetchContentRunes+25),
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}))
 	defer ts.Close()
-	t.Setenv("OLLAMA_HOST", ts.URL)
+	t.Setenv("LOOM_HOST", ts.URL)
 
 	result, err := (&WebFetch{}).Execute(t.Context(), coreagent.ToolContext{}, map[string]any{
-		"url": "https://ollama.com",
+		"url": "https://loom.com",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -200,7 +200,7 @@ func TestWebFetchBoundsContentBeforeReturning(t *testing.T) {
 }
 
 func TestWebToolsRejectWhenCloudDisabled(t *testing.T) {
-	t.Setenv("OLLAMA_NO_CLOUD", "1")
+	t.Setenv("LOOM_NO_CLOUD", "1")
 
 	for _, tt := range webToolCases {
 		t.Run(tt.name, func(t *testing.T) {

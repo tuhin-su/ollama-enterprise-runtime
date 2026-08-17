@@ -126,7 +126,7 @@ func TestResolveCloudProxyBaseURL_DevRejectsNonLoopbackHTTP(t *testing.T) {
 }
 
 func TestBuildCloudSignatureChallengeIncludesExistingQuery(t *testing.T) {
-	req, err := http.NewRequest(http.MethodPost, "https://ollama.com/v1/messages?beta=true&foo=bar", nil)
+	req, err := http.NewRequest(http.MethodPost, "https://loom.com/v1/messages?beta=true&foo=bar", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestCloudPassthroughMiddleware_ZstdBodyTooLarge(t *testing.T) {
 }
 
 func TestBuildCloudSignatureChallengeOverwritesExistingTimestamp(t *testing.T) {
-	req, err := http.NewRequest(http.MethodPost, "https://ollama.com/v1/messages?beta=true&ts=999", nil)
+	req, err := http.NewRequest(http.MethodPost, "https://loom.com/v1/messages?beta=true&ts=999", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}

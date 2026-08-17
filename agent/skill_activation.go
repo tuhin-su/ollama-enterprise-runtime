@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 // activateSkill loads opts.SkillName from the catalog and injects a synthetic

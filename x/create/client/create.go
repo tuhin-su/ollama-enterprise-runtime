@@ -18,19 +18,19 @@ import (
 
 	"golang.org/x/mod/semver"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/manifest"
-	modelparsers "github.com/ollama/ollama/model/parsers"
-	"github.com/ollama/ollama/parser"
-	"github.com/ollama/ollama/progress"
-	"github.com/ollama/ollama/types/model"
-	"github.com/ollama/ollama/x/create"
-	imagemanifest "github.com/ollama/ollama/x/imagegen/manifest"
-	"github.com/ollama/ollama/x/quant"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/manifest"
+	modelparsers "github.com/loom/loom/model/parsers"
+	"github.com/loom/loom/parser"
+	"github.com/loom/loom/progress"
+	"github.com/loom/loom/types/model"
+	"github.com/loom/loom/x/create"
+	imagemanifest "github.com/loom/loom/x/imagegen/manifest"
+	"github.com/loom/loom/x/quant"
 )
 
-// MinOllamaVersion is the minimum Ollama version required for safetensors models.
-const MinOllamaVersion = "0.19.0"
+// MinLoomVersion is the minimum Loom version required for safetensors models.
+const MinLoomVersion = "0.19.0"
 
 // ModelfileConfig holds configuration extracted from a Modelfile.
 type ModelfileConfig struct {
@@ -87,9 +87,9 @@ func ConfigFromModelfile(modelfile *parser.Modelfile) (string, *ModelfileConfig,
 			if !semver.IsValid(requires) {
 				return "", nil, fmt.Errorf("requires must be a valid semver (e.g. 0.14.0)")
 			}
-			minVersion := "v" + MinOllamaVersion
+			minVersion := "v" + MinLoomVersion
 			if semver.Compare(requires, minVersion) < 0 {
-				return "", nil, fmt.Errorf("requires %s is below the minimum supported version %s for safetensors models", strings.TrimPrefix(requires, "v"), MinOllamaVersion)
+				return "", nil, fmt.Errorf("requires %s is below the minimum supported version %s for safetensors models", strings.TrimPrefix(requires, "v"), MinLoomVersion)
 			}
 			mfConfig.Requires = strings.TrimPrefix(requires, "v")
 		case "description":
@@ -408,7 +408,7 @@ func newManifestWriter(opts CreateOptions, capabilities []string, parserName, re
 			configData.FileType = strings.ToLower(strings.TrimSpace(opts.Quantize))
 		}
 		configData.Capabilities = caps
-		configData.Requires = MinOllamaVersion
+		configData.Requires = MinLoomVersion
 		if opts.Modelfile != nil && opts.Modelfile.Requires != "" {
 			configData.Requires = opts.Modelfile.Requires
 		}
@@ -477,7 +477,7 @@ func createModelfileLayers(mf *ModelfileConfig) ([]manifest.Layer, error) {
 	var layers []manifest.Layer
 
 	if mf.Template != "" {
-		layer, err := manifest.NewLayer(bytes.NewReader([]byte(mf.Template)), "application/vnd.ollama.image.template")
+		layer, err := manifest.NewLayer(bytes.NewReader([]byte(mf.Template)), "application/vnd.loom.image.template")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create template layer: %w", err)
 		}
@@ -485,7 +485,7 @@ func createModelfileLayers(mf *ModelfileConfig) ([]manifest.Layer, error) {
 	}
 
 	if mf.System != "" {
-		layer, err := manifest.NewLayer(bytes.NewReader([]byte(mf.System)), "application/vnd.ollama.image.system")
+		layer, err := manifest.NewLayer(bytes.NewReader([]byte(mf.System)), "application/vnd.loom.image.system")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create system layer: %w", err)
 		}
@@ -493,7 +493,7 @@ func createModelfileLayers(mf *ModelfileConfig) ([]manifest.Layer, error) {
 	}
 
 	if mf.License != "" {
-		layer, err := manifest.NewLayer(bytes.NewReader([]byte(mf.License)), "application/vnd.ollama.image.license")
+		layer, err := manifest.NewLayer(bytes.NewReader([]byte(mf.License)), "application/vnd.loom.image.license")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create license layer: %w", err)
 		}
@@ -506,7 +506,7 @@ func createModelfileLayers(mf *ModelfileConfig) ([]manifest.Layer, error) {
 			return nil, fmt.Errorf("failed to encode parameters: %w", err)
 		}
 
-		layer, err := manifest.NewLayer(&b, "application/vnd.ollama.image.params")
+		layer, err := manifest.NewLayer(&b, "application/vnd.loom.image.params")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create params layer: %w", err)
 		}

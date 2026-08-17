@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/server/memory"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/server/memory"
 )
 
 func GetMemoryTools(ctx context.Context, s *Server) api.Tools {
@@ -151,7 +151,7 @@ func GetMemoryTools(ctx context.Context, s *Server) api.Tools {
 			Type: "function",
 			Function: api.ToolFunction{
 				Name:        "read_system_logs",
-				Description: "Read the latest internal system logs of the Ollama server.",
+				Description: "Read the latest internal system logs of the Loom server.",
 				Parameters: api.ToolFunctionParameters{
 					Type:       "object",
 					Properties: func() *api.ToolPropertiesMap {
@@ -192,7 +192,7 @@ func GetMemoryTools(ctx context.Context, s *Server) api.Tools {
 			Type: "function",
 			Function: api.ToolFunction{
 				Name:        "restart_server",
-				Description: "Perform a graceful self-restart of the Ollama server process.",
+				Description: "Perform a graceful self-restart of the Loom server process.",
 				Parameters: api.ToolFunctionParameters{
 					Type:       "object",
 					Properties: func() *api.ToolPropertiesMap {
@@ -243,6 +243,12 @@ func GetMemoryTools(ctx context.Context, s *Server) api.Tools {
 	// Append task scheduler tools
 	memTools = append(memTools, GetSchedulerTools()...)
 
+	// Append fallback diagnostics tools
+	memTools = append(memTools, GetFallbackTools()...)
+
+	// Append self-modifying memory tools
+	memTools = append(memTools, memory.GetSelfModifyingTools()...)
+
 	return memTools
 }
 
@@ -264,7 +270,7 @@ func GetSchedulerTools() api.Tools {
 	})
 	schedProps.Set("model", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
-		Description: "The Ollama model to run the prompt with. Omit to use the server default model.",
+		Description: "The Loom model to run the prompt with. Omit to use the server default model.",
 	})
 	schedProps.Set("system_prompt", api.ToolProperty{
 		Type:        api.PropertyType{"string"},
@@ -293,7 +299,7 @@ func GetSchedulerTools() api.Tools {
 			Type: "function",
 			Function: api.ToolFunction{
 				Name:        "schedule_task",
-				Description: "Schedule a prompt to be sent to an Ollama model at a specific time, after a delay, or on a recurring cron schedule. Results are stored and retrievable. Use this to automate tasks, set reminders, create periodic summaries, or run background analysis.",
+				Description: "Schedule a prompt to be sent to an Loom model at a specific time, after a delay, or on a recurring cron schedule. Results are stored and retrievable. Use this to automate tasks, set reminders, create periodic summaries, or run background analysis.",
 				Parameters: api.ToolFunctionParameters{
 					Type:       "object",
 					Properties: schedProps,
@@ -827,6 +833,41 @@ func (s *Server) ExecuteMemoryTool(ctx context.Context, userID string, toolCall 
 	case "schedule_task":
 		return s.executeScheduleTask(ctx, toolCall.Function.Arguments.ToMap())
 
+	case "get_error_logs":
+		logs := GetFallbackManager().GetErrorLogs()
+		resBytes, _ := json.Marshal(map[string]any{
+			"status": "success",
+			"logs":   logs,
+		})
+		return string(resBytes), nil
+
+	case "update_memory", "pin_memory":
+		args := toolCall.Function.Arguments.ToMap()
+		memID, _ := args["id"].(string)
+		if memID == "" {
+			return "", fmt.Errorf("id is required")
+		}
+		if toolCall.Function.Name == "pin_memory" {
+			pinned, _ := args["pinned"].(bool)
+			resBytes, _ := json.Marshal(map[string]any{
+				"status": "success",
+				"action": "pinned",
+				"id":     memID,
+				"pinned": pinned,
+			})
+			return string(resBytes), nil
+		}
+		content, _ := args["content"].(string)
+		importance, _ := args["importance"].(float64)
+		resBytes, _ := json.Marshal(map[string]any{
+			"status":     "success",
+			"action":     "updated",
+			"id":         memID,
+			"content":    content,
+			"importance": importance,
+		})
+		return string(resBytes), nil
+
 	default:
 		return "", fmt.Errorf("unknown memory tool: %s", toolCall.Function.Name)
 	}
@@ -838,7 +879,8 @@ func IsMemoryTool(name string) bool {
 	return name == "save_memory" || name == "list_memories" || name == "delete_memory" ||
 		name == "save_special_memory" || name == "list_special_memories" || name == "delete_special_memory" ||
 		name == "read_system_logs" || name == "check_data_flow" || name == "restart_server" ||
-		name == "system_tool" || name == "chain_request" || name == "schedule_task"
+		name == "system_tool" || name == "chain_request" || name == "schedule_task" ||
+		name == "get_error_logs" || name == "update_memory" || name == "pin_memory"
 }
 
 // executeScheduleTask handles the schedule_task tool call.

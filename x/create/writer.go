@@ -6,10 +6,10 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/ollama/ollama/x/safetensors"
+	"github.com/loom/loom/x/safetensors"
 )
 
-const mediaTypeImageTensor = "application/vnd.ollama.image.tensor"
+const mediaTypeImageTensor = "application/vnd.loom.image.tensor"
 
 // BlobStore stores a finished blob and returns its layer info. The writer
 // produces the blob bytes; where they are stored — the local model store, or a

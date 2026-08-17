@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/mlxrunner/mlx"
 )
 
 func TestParseSuppressTokens(t *testing.T) {

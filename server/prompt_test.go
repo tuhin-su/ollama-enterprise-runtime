@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/template"
-	"github.com/ollama/ollama/types/model"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/template"
+	"github.com/loom/loom/types/model"
 )
 
 func testConfigWithRenderer(renderer string) model.ConfigV2 {

@@ -12,8 +12,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/ollama/ollama/agent"
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/agent"
+	"github.com/loom/loom/api"
 )
 
 const (
@@ -82,7 +82,7 @@ func (b *Bash) Execute(ctx context.Context, toolCtx agent.ToolContext, args map[
 	ctx, cancel := context.WithTimeout(ctx, bashTimeout)
 	defer cancel()
 
-	cwdFile, err := os.CreateTemp("", "ollama-agent-cwd-*")
+	cwdFile, err := os.CreateTemp("", "loom-agent-cwd-*")
 	if err != nil {
 		return agent.ToolResult{}, err
 	}

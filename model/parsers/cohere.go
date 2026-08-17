@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 // CohereParser parses output from Cohere North / Command A 2026 models

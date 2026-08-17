@@ -3,7 +3,7 @@ package convert
 import (
 	"cmp"
 
-	"github.com/ollama/ollama/fs/ggml"
+	"github.com/loom/loom/fs/ggml"
 )
 
 type ropeScaling struct {

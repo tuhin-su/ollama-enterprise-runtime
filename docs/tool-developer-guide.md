@@ -1,10 +1,10 @@
-# Ollama Developer Guide: Tools and Client Applications
+# Loom Developer Guide: Tools and Client Applications
 
-Welcome to the Ollama developer guide. This document explains how you can develop rich client applications and integrate tools with Ollama's agentic backend.
+Welcome to the Loom developer guide. This document explains how you can develop rich client applications and integrate tools with Loom's agentic backend.
 
 ## 1. Developing Tools
 
-Ollama supports a native tool architecture. This means models can invoke specific functions that you define, which is incredibly useful for connecting models to APIs, internal databases, or local filesystems.
+Loom supports a native tool architecture. This means models can invoke specific functions that you define, which is incredibly useful for connecting models to APIs, internal databases, or local filesystems.
 
 ### Defining a Tool
 
@@ -41,39 +41,39 @@ When a model decides to invoke a tool, its response will include a `tool_calls` 
 1. Parse the tool call.
 2. Execute the underlying logic on the client side (e.g., call a weather API).
 3. Append a new message to the conversation history with `role: "tool"` and the output of the function.
-4. Send the updated conversation back to Ollama to synthesize the final response.
+4. Send the updated conversation back to Loom to synthesize the final response.
 
 ## 2. Dynamic Tool Registration (WebSockets)
 
-Ollama utilizes a **RAG Tool Architecture** backed by a LanceDB vector database to prevent context window bloat. Instead of passing massive lists of tools in your `/api/chat` payload, developers can connect persistent tool scripts via WebSockets!
+Loom utilizes a **RAG Tool Architecture** backed by a LanceDB vector database to prevent context window bloat. Instead of passing massive lists of tools in your `/api/chat` payload, developers can connect persistent tool scripts via WebSockets!
 
 ### Connecting a Tool Script
-1. Connect a WebSocket client to Ollama (typically ws://localhost:11434).
+1. Connect a WebSocket client to Loom (typically ws://localhost:11434).
 2. Send a `register` payload containing your tool's JSON schema.
-3. Ollama automatically embeds your tool's description and stores it in the `ToolManager` database.
-4. When a user chats with Ollama, the AI uses a single `toolmanager.search` meta-tool to query for your specific tool based on semantic meaning!
+3. Loom automatically embeds your tool's description and stores it in the `ToolManager` database.
+4. When a user chats with Loom, the AI uses a single `toolmanager.search` meta-tool to query for your specific tool based on semantic meaning!
 5. When the AI selects your tool, the backend sends an `execute` payload down your WebSocket connection.
 
-*Benefits:* The model's context window stays incredibly lean, and you can expose hundreds of custom tools to Ollama without any performance degradation.
+*Benefits:* The model's context window stays incredibly lean, and you can expose hundreds of custom tools to Loom without any performance degradation.
 
 ## 3. Developing Client Applications
 
-Client applications can interact with Ollama via its robust REST API or official SDKs (`ollama-python` and `ollama-js`).
+Client applications can interact with Loom via its robust REST API or official SDKs (`loom-python` and `loom-js`).
 
 ### Leveraging Agentic Routing
 
-Ollama's backend automatically parses the `DESCRIPTION` of your local models. If you are building an application that needs specialized capabilities (like vision, math, or coding), you do not need to hardcode specific model names (like `qwen2.5-vl-7b:latest`). 
+Loom's backend automatically parses the `DESCRIPTION` of your local models. If you are building an application that needs specialized capabilities (like vision, math, or coding), you do not need to hardcode specific model names (like `qwen2.5-vl-7b:latest`). 
 
-Instead, your client can rely on Ollama's native model chaining:
+Instead, your client can rely on Loom's native model chaining:
 - Ensure your specialized models are loaded locally and have descriptive `DESCRIPTION` fields in their `Modelfiles` (e.g., `DESCRIPTION A vision processing model`).
 - Your client application can simply invoke the default model, and the backend orchestrator will dynamically route tasks to the specialist models as needed via the `chain_request` mechanism.
 
 ### Example: Python Client using Tools
 
-Here is a simple python snippet demonstrating how a client application can pass a tool to Ollama:
+Here is a simple python snippet demonstrating how a client application can pass a tool to Loom:
 
 ```python
-from ollama import chat
+from loom import chat
 
 # 1. Define the tool
 weather_tool = {

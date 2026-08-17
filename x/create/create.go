@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ollama/ollama/envconfig"
-	"github.com/ollama/ollama/x/safetensors"
+	"github.com/loom/loom/envconfig"
+	"github.com/loom/loom/x/safetensors"
 )
 
 // ModelConfig represents the config blob stored with a model.
@@ -51,7 +51,7 @@ func defaultBlobDir() string {
 
 // resolveManifestPath converts a model name to a manifest file path.
 func resolveManifestPath(modelName string) string {
-	host := "registry.ollama.ai"
+	host := "registry.loom.ai"
 	namespace := "library"
 	name := modelName
 	tag := "latest"

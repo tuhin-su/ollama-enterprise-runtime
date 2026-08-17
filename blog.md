@@ -1,7 +1,7 @@
-# Engineering Ollama: A Complete Journey from Static Inference Router to Autonomous AI Operating System
+# Engineering Loom: A Complete Journey from Static Inference Router to Autonomous AI Operating System
 
 > **Author:** Tuhin | **Stack:** Go, LanceDB, LLaMA.cpp, WebSockets, Ristretto Cache
-> **Repository:** `ollama-master` | **Platform:** Linux x86-64
+> **Repository:** `loom-master` | **Platform:** Linux x86-64
 
 ---
 
@@ -26,9 +26,9 @@
 
 ## 1. Executive Summary
 
-Ollama began its life as a clean, minimal LLM inference router — a Go HTTP server that loaded GGUF model weights, forwarded prompts into a `llama-server` subprocess, and streamed tokens back to the client. Elegant in simplicity, but fundamentally limited in ambition.
+Loom began its life as a clean, minimal LLM inference router — a Go HTTP server that loaded GGUF model weights, forwarded prompts into a `llama-server` subprocess, and streamed tokens back to the client. Elegant in simplicity, but fundamentally limited in ambition.
 
-Over the course of this engineering sprint, we transformed Ollama into something far more powerful: a **stateful, memory-persistent, tool-aware, multi-model orchestration layer** capable of autonomous operation. This is not a surface-level feature addition. Every change went deep into the core request pipeline — `routes.go`, `memory_middleware.go`, `model_chain.go` — rearchitecting the fundamental prompt assembly and inference dispatch loops.
+Over the course of this engineering sprint, we transformed Loom into something far more powerful: a **stateful, memory-persistent, tool-aware, multi-model orchestration layer** capable of autonomous operation. This is not a surface-level feature addition. Every change went deep into the core request pipeline — `routes.go`, `memory_middleware.go`, `model_chain.go` — rearchitecting the fundamental prompt assembly and inference dispatch loops.
 
 This document is the complete technical record of that journey.
 
@@ -124,9 +124,9 @@ The naive workaround — appending a raw `CHAT_HISTORY` dump to every prompt —
 
 ### The "What"
 
-We built a **hierarchical, vector-indexed, persistent memory engine** directly into the Ollama backend. Memories are:
+We built a **hierarchical, vector-indexed, persistent memory engine** directly into the Loom backend. Memories are:
 - Extracted autonomously from every conversation response via pattern matching.
-- Stored as embedding vectors in a **LanceDB** database at `~/.ollama/memory.db`.
+- Stored as embedding vectors in a **LanceDB** database at `~/.loom/memory.db`.
 - Cached in-memory via a **Ristretto** TTL cache for sub-millisecond hot-path reads.
 - Ranked by a decay-weighted importance score and injected into the system prompt as a concise context block on every subsequent request.
 
@@ -136,17 +136,17 @@ We built a **hierarchical, vector-indexed, persistent memory engine** directly i
 ```
 Server boot
     │
-    ├── memory.LoadConfig()  → reads ~/.ollama/server.json
+    ├── memory.LoadConfig()  → reads ~/.loom/server.json
     │       ├── enabled: true/false
-    │       ├── db_path: ~/.ollama/memory.db (LanceDB)
-    │       ├── embedding_model: (local Ollama model name)
+    │       ├── db_path: ~/.loom/memory.db (LanceDB)
+    │       ├── embedding_model: (local Loom model name)
     │       ├── top_k: (max memories injected per request)
     │       ├── similarity_threshold: (cosine cutoff)
     │       └── importance_threshold: (decay-weighted score cutoff)
     │
     └── memory.NewEngine(cfg)
             ├── store_lancedb.New()     → opens/creates LanceDB tables
-            ├── embedder_ollama.New()   → connects to local embedding model
+            ├── embedder_loom.New()   → connects to local embedding model
             ├── cache_ristretto.New()   → initializes in-memory LRU cache
             └── eng.Start(ctx)          → launches background decay processor goroutine
 ```
@@ -190,7 +190,7 @@ Streaming response channel
 | Type | Description | Example |
 |---|---|---|
 | `user` | Persistent personal facts | "User's name is Tuhin" |
-| `project` | Active project context | "Working on Ollama tool architecture" |
+| `project` | Active project context | "Working on Loom tool architecture" |
 | `conversation` | Session-scoped summaries | "Discussed RAG implementation" |
 | `episodic` | Time-stamped events | "Deployed at 2026-07-29" |
 | `semantic` | Conceptual knowledge | "Prefers Go over Python for backends" |
@@ -210,7 +210,7 @@ Streaming response channel
 
 ### The Problem
 
-Function-calling in LLMs requires the orchestrator to embed complete JSON schemas for every available tool inside the system prompt. With 11 built-in Ollama tools and potentially hundreds of external developer tools connected via WebSocket, this approach is catastrophically inefficient:
+Function-calling in LLMs requires the orchestrator to embed complete JSON schemas for every available tool inside the system prompt. With 11 built-in Loom tools and potentially hundreds of external developer tools connected via WebSocket, this approach is catastrophically inefficient:
 
 - 11 built-in tools × ~200 tokens each = **~2,200 tokens consumed on every single request**
 - External developer tools on top = easily **4,000–6,000 tokens wasted pre-fill**
@@ -218,15 +218,15 @@ Function-calling in LLMs requires the orchestrator to embed complete JSON schema
 
 ### The "What"
 
-We implemented a **RAG-based Tool Discovery System** backed by a volatile **LanceDB** vector index at `~/.ollama/toolsmanager_db`. The entire taxonomy of available tools — both Ollama's 11 built-ins and any externally connected tools — is stored as high-dimensional embedding vectors. The LLM is given a single, ultra-concise **meta-tool** called `toolmanager.search` in its context window. Tool retrieval is demand-driven, not pre-loaded.
+We implemented a **RAG-based Tool Discovery System** backed by a volatile **LanceDB** vector index at `~/.loom/toolsmanager_db`. The entire taxonomy of available tools — both Loom's 11 built-ins and any externally connected tools — is stored as high-dimensional embedding vectors. The LLM is given a single, ultra-concise **meta-tool** called `toolmanager.search` in its context window. Tool retrieval is demand-driven, not pre-loaded.
 
 ### The "How" (Implementation Deep Dive)
 
 **Server Initialization** (`server/tool_manager.go: InitToolManager`):
 ```
-./ollama serve
+./loom serve
     │
-    ├── os.RemoveAll(~/.ollama/toolsmanager_db)   ← WIPE stale data
+    ├── os.RemoveAll(~/.loom/toolsmanager_db)   ← WIPE stale data
     │
     ├── lancedb.Connect(toolsmanager_db)           ← Create fresh DB
     │
@@ -283,7 +283,7 @@ Model generates: tool_call { name: "toolmanager.search", args: { query: "save a 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                  OLLAMA CONTEXT WINDOW                  │
+│                  LOOM CONTEXT WINDOW                  │
 │                                                         │
 │  [System Prompt]  [Memories]  [Chat History]            │
 │                                                         │
@@ -333,13 +333,13 @@ Integrating custom tools (Python scripts, database connectors, browser automatio
 
 ### The "What"
 
-We built a native `ToolInterfaceHandler` at `/api/tools/interface` within the Ollama HTTP router. External processes establish persistent WebSocket connections, register their tool schemas, and receive execution dispatch events directly from the inference loop. This eliminates all polling overhead and integrates tool execution as a first-class streaming primitive.
+We built a native `ToolInterfaceHandler` at `/api/tools/interface` within the Loom HTTP router. External processes establish persistent WebSocket connections, register their tool schemas, and receive execution dispatch events directly from the inference loop. This eliminates all polling overhead and integrates tool execution as a first-class streaming primitive.
 
 ### The "How" (Implementation Deep Dive)
 
 **Protocol Flow** (`server/tool_interface.go`):
 ```
-External Python Script                    Ollama Server
+External Python Script                    Loom Server
        │                                       │
        ├──── WS Connect to /api/tools/interface ──►│
        │                                       │
@@ -399,7 +399,7 @@ for _, toolName := range client.ToolNames {
 
 | Before | After |
 |---|---|
-| External Python runtime owns the execution loop | Ollama natively owns the execution loop |
+| External Python runtime owns the execution loop | Loom natively owns the execution loop |
 | Polling-based tool call detection | Event-driven WebSocket dispatch |
 | Tool execution breaks streaming | Streaming transparent to tool calls |
 | Tool definitions injected in every HTTP request payload | Tools registered once, retrieved via RAG |
@@ -479,7 +479,7 @@ ExecuteChainPipeline():
 
 **Modelfile DESCRIPTION Integration:**
 ```
-# ~/.ollama/models/manifests/.../llava:7b (Modelfile)
+# ~/.loom/models/manifests/.../llava:7b (Modelfile)
 FROM llava:7b
 DESCRIPTION A multimodal vision-language model supporting image analysis and OCR.
 SYSTEM You are a vision AI assistant.
@@ -506,7 +506,7 @@ LLMs executing user requests are synchronous by necessity — the user is waitin
 
 ### The "What"
 
-We built a native **in-process background job scheduler** (`server/task_scheduler.go`) that persists jobs to `~/.ollama/scheduled_jobs.json`. The scheduler supports one-shot execution at RFC3339 timestamps, relative delay offsets (`"in 5m"`, `"2h30m"`), and full 5-field cron expressions (`*/5 * * * *`).
+We built a native **in-process background job scheduler** (`server/task_scheduler.go`) that persists jobs to `~/.loom/scheduled_jobs.json`. The scheduler supports one-shot execution at RFC3339 timestamps, relative delay offsets (`"in 5m"`, `"2h30m"`), and full 5-field cron expressions (`*/5 * * * *`).
 
 ### The "How" (Implementation Deep Dive)
 
@@ -564,7 +564,7 @@ We built a native **in-process background job scheduler** (`server/task_schedule
 }
 ```
 
-**Persistence Schema** (`~/.ollama/scheduled_jobs.json`):
+**Persistence Schema** (`~/.loom/scheduled_jobs.json`):
 ```json
 [
   {
@@ -669,15 +669,15 @@ system_tool(action, params)
 
 ### The Problem
 
-The LLM API ecosystem has fragmented into at least three competing protocol standards: Ollama native (`/api/chat`), OpenAI v1 (`/v1/chat/completions`), and Anthropic (`/v1/messages`). Client applications built for OpenAI cannot directly consume Ollama's API without modification — forcing developers to choose between ecosystem compatibility and local inference.
+The LLM API ecosystem has fragmented into at least three competing protocol standards: Loom native (`/api/chat`), OpenAI v1 (`/v1/chat/completions`), and Anthropic (`/v1/messages`). Client applications built for OpenAI cannot directly consume Loom's API without modification — forcing developers to choose between ecosystem compatibility and local inference.
 
 ### The "What"
 
-Ollama's `routes.go` exposes a unified Gin HTTP router serving all three protocol families from a single process, with full request/response translation layers.
+Loom's `routes.go` exposes a unified Gin HTTP router serving all three protocol families from a single process, with full request/response translation layers.
 
 ### Protocol Coverage
 
-**Native Ollama API:**
+**Native Loom API:**
 ```
 POST   /api/generate          → GenerateHandler
 POST   /api/chat              → ChatHandler
@@ -708,10 +708,10 @@ POST   /v1/audio/transcriptions→ Audio transcription (delegated via chain)
 **Anthropic v1 Translation:**
 ```
 POST   /v1/messages           → AnthropicMessagesHandler
-    ├── Translates Anthropic message format → Ollama native format
+    ├── Translates Anthropic message format → Loom native format
     ├── Handles content blocks (text, image, tool_use, tool_result)
     ├── Dynamic vision model routing via selectModelForTask()
-    └── Translates Ollama response → Anthropic response format
+    └── Translates Loom response → Anthropic response format
 ```
 
 **Experimental APIs:**
@@ -744,7 +744,7 @@ Enterprises and developers frequently need access to both local quantized models
 
 ### The "What"
 
-Ollama's `cloud_proxy.go` implements a transparent **reverse proxy layer** that intercepts inference requests targeting models configured with `RemoteHost` and `RemoteModel` properties in their Modelfile, forwarding them to the specified remote endpoint while presenting a unified local API surface to the client.
+Loom's `cloud_proxy.go` implements a transparent **reverse proxy layer** that intercepts inference requests targeting models configured with `RemoteHost` and `RemoteModel` properties in their Modelfile, forwarding them to the specified remote endpoint while presenting a unified local API surface to the client.
 
 ### The "How"
 
@@ -762,7 +762,7 @@ POST /api/chat { model: "gpt4-proxy" }
     ├── Load model config → detect RemoteHost, RemoteModel
     │
     ├── cloudPassthroughMiddleware()
-    │       ├── Translate Ollama request → target protocol format
+    │       ├── Translate Loom request → target protocol format
     │       ├── Forward to https://api.openai.com/v1/chat/completions
     │       ├── Stream remote response back to local client
     │       └── Handle auth headers (Bearer token passthrough)
@@ -779,7 +779,7 @@ POST /api/chat { model: "gpt4-proxy" }
 
 | Before | After |
 |---|---|
-| Two separate API clients required | Single unified Ollama API |
+| Two separate API clients required | Single unified Loom API |
 | Manual model routing logic in application | Transparent proxy at model config level |
 | Hardcoded cloud API endpoints | Configurable per-model via Modelfile |
 
@@ -789,17 +789,17 @@ POST /api/chat { model: "gpt4-proxy" }
 
 ### The Problem
 
-Ollama serves its API on `0.0.0.0` by default in many deployment configurations. Without authentication, any process on the host or network can invoke `/api/chat`, potentially abusing local compute resources or exfiltrating context from sensitive conversations.
+Loom serves its API on `0.0.0.0` by default in many deployment configurations. Without authentication, any process on the host or network can invoke `/api/chat`, potentially abusing local compute resources or exfiltrating context from sensitive conversations.
 
 ### The "What"
 
-We implemented a **Bearer token authentication middleware** (`tokenAuthMiddleware`) that enforces an `Authorization: Bearer <token>` header on all API endpoints, with the token configured via `~/.ollama/server.json`.
+We implemented a **Bearer token authentication middleware** (`tokenAuthMiddleware`) that enforces an `Authorization: Bearer <token>` header on all API endpoints, with the token configured via `~/.loom/server.json`.
 
 ### The "How"
 
 **Configuration:**
 ```json
-// ~/.ollama/server.json
+// ~/.loom/server.json
 {
   "api_token": "your-secret-token-here"
 }
@@ -836,7 +836,7 @@ Incoming HTTP Request
 
 ### The Problem
 
-Ollama's memory export system originally serialized all memory records, conversations, and special memories to JSON. While human-readable, JSON serialization for large memory databases suffers from:
+Loom's memory export system originally serialized all memory records, conversations, and special memories to JSON. While human-readable, JSON serialization for large memory databases suffers from:
 - Verbose token overhead (field names repeated for every record)
 - CPU overhead in `encoding/json` marshaling/unmarshaling for large record sets
 - Fragile format for binary data (embeddings must be base64-encoded)
@@ -935,10 +935,10 @@ After (RAG Tool Architecture):
 What started as a stateless HTTP-to-llama.cpp proxy has been transformed into a comprehensive AI operating layer. The architectural choices made throughout this engineering sprint were deliberately conservative in scope but radical in impact:
 
 - We did not add external dependencies arbitrarily — LanceDB was already part of the memory system; we simply extended its role to cover tools.
-- We did not break backward compatibility — all existing Ollama API clients continue to work without modification.
+- We did not break backward compatibility — all existing Loom API clients continue to work without modification.
 - We did not compromise on performance — every new feature was designed to *reduce* computational overhead on the hot inference path, not increase it.
 
-The result is an Ollama that is simultaneously more capable, more efficient, and more extensible than its predecessor. Local AI is no longer constrained to stateless, single-turn inference. It is now a fully stateful, multi-model, self-scheduling autonomous system — all running on your own hardware.
+The result is an Loom that is simultaneously more capable, more efficient, and more extensible than its predecessor. Local AI is no longer constrained to stateless, single-turn inference. It is now a fully stateful, multi-model, self-scheduling autonomous system — all running on your own hardware.
 
 ---
 
@@ -950,7 +950,7 @@ The result is an Ollama that is simultaneously more capable, more efficient, and
 initTaskScheduler()
     │
     └── globalScheduler = &TaskScheduler{
-            jobs:     load(~/.ollama/scheduler.json),  ← Heal "running" → "failed"
+            jobs:     load(~/.loom/scheduler.json),  ← Heal "running" → "failed"
             ticker:   time.NewTicker(15 * time.Second), ← 15s resolution
             doneJobRetention: 24 * time.Hour,
         }
@@ -1009,7 +1009,7 @@ ProcessRequest(userID, messages):
     ├── 8. PromptBuilder.Build(ranked_memories)
     │         "## Relevant Context from Memory\n"
     │         "- User's name is Tuhin (importance: 0.80)\n"
-    │         "- Working on Ollama RAG architecture (importance: 0.75)\n"
+    │         "- Working on Loom RAG architecture (importance: 0.75)\n"
     │
     └── 9. Prepend to system prompt → forward to llama.cpp
 ```
@@ -1044,15 +1044,15 @@ errCount  = countLogPattern("ERR")
 Unlike standard episodic memories which are free-form text, **Special Memories** function as a structured, semantically searchable key-value store:
 
 ```
-save_special_memory(key="CURRENT_PROJECT", value="Ollama RAG Architecture")
+save_special_memory(key="CURRENT_PROJECT", value="Loom RAG Architecture")
     │
-    ├── content = "CURRENT_PROJECT: Ollama RAG Architecture"
+    ├── content = "CURRENT_PROJECT: Loom RAG Architecture"
     ├── embedding = embedder.Embed(content)
     ├── SpecialMemory{
     │       ID:        uuid.New(),
     │       UserID:    userID,
     │       Key:       "CURRENT_PROJECT",
-    │       Value:     "Ollama RAG Architecture",
+    │       Value:     "Loom RAG Architecture",
     │       Embedding: embedding,
     │       CreatedAt: time.Now(),
     │   }

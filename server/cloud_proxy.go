@@ -18,18 +18,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/ollama/ollama/auth"
-	"github.com/ollama/ollama/envconfig"
-	internalcloud "github.com/ollama/ollama/internal/cloud"
-	"github.com/ollama/ollama/version"
+	"github.com/loom/loom/auth"
+	"github.com/loom/loom/envconfig"
+	internalcloud "github.com/loom/loom/internal/cloud"
+	"github.com/loom/loom/version"
 )
 
 const (
-	defaultCloudProxyBaseURL      = "https://ollama.com:443"
-	defaultCloudProxySigningHost  = "ollama.com"
-	cloudProxyBaseURLEnv          = "OLLAMA_CLOUD_BASE_URL"
+	defaultCloudProxyBaseURL      = "https://loom.com:443"
+	defaultCloudProxySigningHost  = "loom.com"
+	cloudProxyBaseURLEnv          = "LOOM_CLOUD_BASE_URL"
 	legacyCloudAnthropicKey       = "legacy_cloud_anthropic_web_search"
-	cloudProxyClientVersionHeader = "X-Ollama-Client-Version"
+	cloudProxyClientVersionHeader = "X-Loom-Client-Version"
 
 	// maxDecompressedBodySize limits the size of a decompressed request body
 	maxDecompressedBodySize = 20 << 20

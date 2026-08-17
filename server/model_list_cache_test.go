@@ -13,10 +13,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/ollama/ollama/api"
-	fsgguf "github.com/ollama/ollama/fs/gguf"
-	"github.com/ollama/ollama/manifest"
-	"github.com/ollama/ollama/types/model"
+	"github.com/loom/loom/api"
+	fsgguf "github.com/loom/loom/fs/gguf"
+	"github.com/loom/loom/manifest"
+	"github.com/loom/loom/types/model"
 )
 
 func TestModelListCacheHydratesSummary(t *testing.T) {

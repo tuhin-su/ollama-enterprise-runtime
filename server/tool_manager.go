@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/server/memory"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/server/memory"
 )
 
 // ToolManager handles the volatile RAG database for dynamic tool retrieval.
@@ -29,7 +29,7 @@ func InitToolManager(ctx context.Context, s *Server) error {
 	if err != nil {
 		return err
 	}
-	dbDir := filepath.Join(home, ".ollama", "toolsmanager_db")
+	dbDir := filepath.Join(home, ".loom", "toolsmanager_db")
 
 	// Volatile: Wipe it clean on startup
 	_ = os.RemoveAll(dbDir)

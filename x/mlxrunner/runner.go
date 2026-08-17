@@ -10,13 +10,13 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/x/internal/mlxthread"
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
-	"github.com/ollama/ollama/x/mlxrunner/model"
-	"github.com/ollama/ollama/x/mlxrunner/model/base"
-	"github.com/ollama/ollama/x/mlxrunner/sample"
-	"github.com/ollama/ollama/x/tokenizer"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/x/internal/mlxthread"
+	"github.com/loom/loom/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/mlxrunner/model"
+	"github.com/loom/loom/x/mlxrunner/model/base"
+	"github.com/loom/loom/x/mlxrunner/sample"
+	"github.com/loom/loom/x/tokenizer"
 )
 
 // Request is a short-lived struct that carries a completion request through

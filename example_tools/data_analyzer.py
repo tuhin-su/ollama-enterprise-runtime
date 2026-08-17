@@ -6,7 +6,7 @@ import websockets
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] data_analyzer: %(message)s")
 logger = logging.getLogger(__name__)
 
-OLLAMA_WS_URL = "ws://localhost:11434/api/tools/interface"
+LOOM_WS_URL = "ws://localhost:11434/api/tools/interface"
 AUTH_TOKEN = "abc"
 TOOL_NAME = "data_analyzer"
 
@@ -79,8 +79,8 @@ def analyze_data(data_list, operation="summary"):
 async def main():
     while True:
         try:
-            logger.info(f"Connecting to Ollama tool interface at {OLLAMA_WS_URL}...")
-            async with websockets.connect(OLLAMA_WS_URL) as websocket:
+            logger.info(f"Connecting to Loom tool interface at {LOOM_WS_URL}...")
+            async with websockets.connect(LOOM_WS_URL) as websocket:
                 register_msg = {
                     "auth_token": AUTH_TOKEN,
                     "role": "tool",

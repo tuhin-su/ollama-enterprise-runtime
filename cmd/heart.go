@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 var heartCmd = &cobra.Command{
@@ -20,10 +20,15 @@ var heartCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println("Starting 24/7 autonomous heartbeat monitor for all models...")
+		cfg := memory.LoadConfig()
+		intervalSec := cfg.HeartbeatIntervalSeconds
+		if intervalSec <= 0 {
+			intervalSec = 30
+		}
+		fmt.Printf("Starting 24/7 autonomous heartbeat monitor for all models (interval: %ds)...\n", intervalSec)
 
 		for {
-			time.Sleep(30 * time.Second) // Pulse interval
+			time.Sleep(time.Duration(intervalSec) * time.Second)
 
 			// 1. Get all loaded models
 			psResp, err := client.ListRunning(context.Background())

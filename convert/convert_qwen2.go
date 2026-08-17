@@ -1,6 +1,6 @@
 package convert
 
-import "github.com/ollama/ollama/fs/ggml"
+import "github.com/loom/loom/fs/ggml"
 
 type qwen2Model struct {
 	ModelParameters

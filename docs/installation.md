@@ -1,6 +1,6 @@
 # Installation
 
-Install Ollama from the [tuhin-su/ollama-master](https://github.com/tuhin-su/ollama-master)
+Install Loom from the [tuhin-su/loom-master](https://github.com/tuhin-su/loom-master)
 release page. The installer auto-detects your OS and CPU architecture.
 
 ---
@@ -8,14 +8,14 @@ release page. The installer auto-detects your OS and CPU architecture.
 ## Linux & macOS — One Command
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuhin-su/ollama-master/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/tuhin-su/loom-master/main/install.sh | sh
 ```
 
 The script:
 1. Detects your OS (`linux` / `darwin`) and architecture (`amd64`, `arm64`, `arm`)
 2. Fetches the latest release from GitHub
 3. Verifies the SHA256 checksum
-4. Installs `ollama` to `/usr/local/bin`
+4. Installs `loom` to `/usr/local/bin`
 5. Optionally registers a **systemd service** on Linux (auto-start on boot)
 
 ### Options
@@ -45,15 +45,15 @@ INSTALL_DIR=$HOME/.local/bin curl -fsSL .../install.sh | sh
 Run in **PowerShell** (Administrator recommended for service registration):
 
 ```powershell
-irm https://raw.githubusercontent.com/tuhin-su/ollama-master/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/tuhin-su/loom-master/main/install.ps1 | iex
 ```
 
 The script:
 1. Detects architecture (`amd64` or `arm64`)
 2. Downloads and verifies the `.zip` release
-3. Installs `ollama.exe` to `%LOCALAPPDATA%\Programs\Ollama`
+3. Installs `loom.exe` to `%LOCALAPPDATA%\Programs\Loom`
 4. Adds the install directory to your `PATH`
-5. Registers and starts **OllamaService** (Windows service, requires admin)
+5. Registers and starts **LoomService** (Windows service, requires admin)
 
 ### Options
 
@@ -63,7 +63,7 @@ $env:VERSION = "v1.2.3"
 irm .../install.ps1 | iex
 
 # Custom install directory
-irm .../install.ps1 | iex -Args "-InstallDir C:\Tools\Ollama"
+irm .../install.ps1 | iex -Args "-InstallDir C:\Tools\Loom"
 ```
 
 ### Supported platforms
@@ -78,24 +78,24 @@ irm .../install.ps1 | iex -Args "-InstallDir C:\Tools\Ollama"
 ## Manual Installation
 
 Download the binary directly from the
-[Releases page](https://github.com/tuhin-su/ollama-master/releases).
+[Releases page](https://github.com/tuhin-su/loom-master/releases).
 
 | Platform | File |
 |----------|------|
-| Linux amd64 | `ollama-linux-amd64.tar.gz` |
-| Linux arm64 | `ollama-linux-arm64.tar.gz` |
-| Linux arm | `ollama-linux-armv7.tar.gz` |
-| Windows amd64 | `ollama-windows-amd64.zip` |
-| Windows arm64 | `ollama-windows-arm64.zip` |
+| Linux amd64 | `loom-linux-amd64.tar.gz` |
+| Linux arm64 | `loom-linux-arm64.tar.gz` |
+| Linux arm | `loom-linux-armv7.tar.gz` |
+| Windows amd64 | `loom-windows-amd64.zip` |
+| Windows arm64 | `loom-windows-arm64.zip` |
 
 Each archive includes a `.sha256` checksum file. Verify before installing:
 
 ```bash
 # Linux / macOS
-sha256sum -c ollama-linux-amd64.tar.gz.sha256
+sha256sum -c loom-linux-amd64.tar.gz.sha256
 
 # Windows (PowerShell)
-(Get-FileHash ollama-windows-amd64.zip -Algorithm SHA256).Hash
+(Get-FileHash loom-windows-amd64.zip -Algorithm SHA256).Hash
 ```
 
 ---
@@ -107,10 +107,10 @@ existing binary in-place.
 
 ```bash
 # Linux / macOS
-curl -fsSL https://raw.githubusercontent.com/tuhin-su/ollama-master/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/tuhin-su/loom-master/main/install.sh | sh
 
 # Windows
-irm https://raw.githubusercontent.com/tuhin-su/ollama-master/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/tuhin-su/loom-master/main/install.ps1 | iex
 ```
 
 ---
@@ -120,12 +120,12 @@ irm https://raw.githubusercontent.com/tuhin-su/ollama-master/main/install.ps1 | 
 ### Linux / macOS
 
 ```bash
-sudo rm /usr/local/bin/ollama
+sudo rm /usr/local/bin/loom
 
 # Remove systemd service (Linux only)
-sudo systemctl stop ollama
-sudo systemctl disable ollama
-sudo rm /etc/systemd/system/ollama.service
+sudo systemctl stop loom
+sudo systemctl disable loom
+sudo rm /etc/systemd/system/loom.service
 sudo systemctl daemon-reload
 ```
 
@@ -133,17 +133,17 @@ sudo systemctl daemon-reload
 
 ```powershell
 # Stop and remove service (if installed)
-sc.exe stop OllamaService
-sc.exe delete OllamaService
+sc.exe stop LoomService
+sc.exe delete LoomService
 
 # Remove binary
-Remove-Item "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
+Remove-Item "$env:LOCALAPPDATA\Programs\Loom\loom.exe"
 ```
 
 ### Remove memory database
 
 ```bash
-rm ~/.ollama/memory.db
+rm ~/.loom/memory.db
 ```
 
 ---
@@ -153,8 +153,8 @@ rm ~/.ollama/memory.db
 See [development.md](development.md) for full instructions.
 
 ```bash
-git clone https://github.com/tuhin-su/ollama-master.git
-cd ollama-master
+git clone https://github.com/tuhin-su/loom-master.git
+cd loom-master
 go build .
-./ollama serve
+./loom serve
 ```

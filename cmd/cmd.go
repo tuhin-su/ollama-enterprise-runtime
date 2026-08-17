@@ -39,25 +39,25 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/term"
 
-	"github.com/ollama/ollama/agent"
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/discover"
-	"github.com/ollama/ollama/envconfig"
-	"github.com/ollama/ollama/format"
-	"github.com/ollama/ollama/internal/modelref"
-	"github.com/ollama/ollama/logutil"
-	"github.com/ollama/ollama/parser"
-	"github.com/ollama/ollama/progress"
-	"github.com/ollama/ollama/readline"
-	"github.com/ollama/ollama/runner"
-	"github.com/ollama/ollama/server"
-	"github.com/ollama/ollama/server/memory"
-	"github.com/ollama/ollama/types/model"
-	"github.com/ollama/ollama/types/syncmap"
-	"github.com/ollama/ollama/version"
-	xcreate "github.com/ollama/ollama/x/create"
-	xcreateclient "github.com/ollama/ollama/x/create/client"
-	"github.com/ollama/ollama/x/imagegen"
+	"github.com/loom/loom/agent"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/discover"
+	"github.com/loom/loom/envconfig"
+	"github.com/loom/loom/format"
+	"github.com/loom/loom/internal/modelref"
+	"github.com/loom/loom/logutil"
+	"github.com/loom/loom/parser"
+	"github.com/loom/loom/progress"
+	"github.com/loom/loom/readline"
+	"github.com/loom/loom/runner"
+	"github.com/loom/loom/server"
+	"github.com/loom/loom/server/memory"
+	"github.com/loom/loom/types/model"
+	"github.com/loom/loom/types/syncmap"
+	"github.com/loom/loom/version"
+	xcreate "github.com/loom/loom/x/create"
+	xcreateclient "github.com/loom/loom/x/create/client"
+	"github.com/loom/loom/x/imagegen"
 )
 
 
@@ -103,7 +103,7 @@ func getModelfileName(cmd *cobra.Command) (string, error) {
 	return absName, nil
 }
 
-// isLocalhost returns true if the configured Ollama host is a loopback or unspecified address.
+// isLocalhost returns true if the configured Loom host is a loopback or unspecified address.
 func isLocalhost() bool {
 	host := envconfig.Host()
 	h, _, _ := net.SplitHostPort(host.Host)
@@ -357,7 +357,7 @@ func CreateHandler(cmd *cobra.Command, args []string) error {
 
 	if err := client.Create(cmd.Context(), req, fn); err != nil {
 		if strings.Contains(err.Error(), "path or Modelfile are required") {
-			return fmt.Errorf("the ollama server must be updated to use `ollama create` with this client")
+			return fmt.Errorf("the loom server must be updated to use `loom create` with this client")
 		}
 		return err
 	}
@@ -442,7 +442,7 @@ func importMemory(ctx context.Context, srcPath string) error {
 	return nil
 }
 
-// ImportHandler handles the `ollama import` command for importing GGUF files directly.
+// ImportHandler handles the `loom import` command for importing GGUF files directly.
 func ImportHandler(cmd *cobra.Command, args []string) error {
 	memoryPath, _ := cmd.Flags().GetString("memory")
 	if memoryPath != "" {
@@ -583,7 +583,7 @@ func ImportHandler(cmd *cobra.Command, args []string) error {
 // e.g. "qwen2.5-vl-7b-instruct-f16.gguf" -> "qwen2.5-vl-7b-instruct-f16"
 //
 // It strips known suffixes like file extensions and common GGUF naming
-// patterns, then sanitizes for use as an Ollama model name.
+// patterns, then sanitizes for use as an Loom model name.
 func deriveModelName(ggufPath string) string {
 	base := filepath.Base(ggufPath)
 
@@ -838,7 +838,7 @@ func SkillHandler(cmd *cobra.Command, args []string) error {
 	return cmd.Help()
 }
 
-// ExportHandler handles exporting a model's GGUF file(s) back out of Ollama.
+// ExportHandler handles exporting a model's GGUF file(s) back out of Loom.
 func ExportHandler(cmd *cobra.Command, args []string) error {
 	modelName := args[0]
 	destPath := args[1]
@@ -1106,9 +1106,9 @@ func loadOrUnloadModel(cmd *cobra.Command, opts *runOptions) error {
 	} else if info.RemoteHost != "" || requestedCloud {
 		// Cloud model, no need to load/unload
 
-		isCloud := requestedCloud || strings.HasPrefix(info.RemoteHost, "https://ollama.com")
+		isCloud := requestedCloud || strings.HasPrefix(info.RemoteHost, "https://loom.com")
 
-		// Check if user is signed in for ollama.com cloud models
+		// Check if user is signed in for loom.com cloud models
 		if isCloud {
 			if _, err := client.Whoami(cmd.Context()); err != nil {
 				return err
@@ -1122,7 +1122,7 @@ func loadOrUnloadModel(cmd *cobra.Command, opts *runOptions) error {
 				remoteModel = opts.Model
 			}
 			if isCloud {
-				fmt.Fprintf(os.Stderr, "Connecting to '%s' on 'ollama.com' ⚡\n", remoteModel)
+				fmt.Fprintf(os.Stderr, "Connecting to '%s' on 'loom.com' ⚡\n", remoteModel)
 			} else {
 				fmt.Fprintf(os.Stderr, "Connecting to '%s' on '%s'\n", remoteModel, info.RemoteHost)
 			}
@@ -1200,7 +1200,7 @@ func generateEmbedding(cmd *cobra.Command, modelName, input string, keepAlive *a
 func handleCloudAuthorizationError(err error) bool {
 	var authErr api.AuthorizationError
 	if errors.As(err, &authErr) && authErr.StatusCode == http.StatusUnauthorized {
-		fmt.Printf("You need to be signed in to Ollama to run Cloud models.\n\n")
+		fmt.Printf("You need to be signed in to Loom to run Cloud models.\n\n")
 		if authErr.SigninURL != "" {
 			fmt.Printf(ConnectInstructions, authErr.SigninURL)
 		}
@@ -1210,7 +1210,7 @@ func handleCloudAuthorizationError(err error) bool {
 	return false
 }
 
-// TEMP(drifkin): To match legacy `ollama run some-model:cloud` behavior, we
+// TEMP(drifkin): To match legacy `loom run some-model:cloud` behavior, we
 // best-effort pull cloud stub files for any explicit cloud source models.
 // Remove this once `/api/tags` is cloud-aware.
 func ensureCloudStub(ctx context.Context, client *api.Client, modelName string) {
@@ -1405,7 +1405,7 @@ func RunHandler(cmd *cobra.Command, args []string) error {
 	// If it's an embedding model, handle embedding generation
 	if isEmbeddingModel {
 		if opts.Prompt == "" {
-			return errors.New("embedding models require input text. Usage: ollama run " + name + " \"your text here\"")
+			return errors.New("embedding models require input text. Usage: loom run " + name + " \"your text here\"")
 		}
 
 		// Get embedding-specific flags
@@ -1425,7 +1425,7 @@ func RunHandler(cmd *cobra.Command, args []string) error {
 	// Check if this is an image generation model
 	if slices.Contains(info.Capabilities, model.CapabilityImage) {
 		if opts.Prompt == "" && !interactive {
-			return errors.New("image generation models require a prompt. Usage: ollama run " + name + " \"your prompt here\"")
+			return errors.New("image generation models require a prompt. Usage: loom run " + name + " \"your prompt here\"")
 		}
 		return imagegen.RunCLI(cmd, name, opts.Prompt, interactive, opts.KeepAlive)
 	}
@@ -1434,7 +1434,7 @@ func RunHandler(cmd *cobra.Command, args []string) error {
 		if err := loadOrUnloadModel(cmd, &opts); err != nil {
 			var sErr api.AuthorizationError
 			if errors.As(err, &sErr) && sErr.StatusCode == http.StatusUnauthorized {
-				fmt.Printf("You need to be signed in to Ollama to run Cloud models.\n\n")
+				fmt.Printf("You need to be signed in to Loom to run Cloud models.\n\n")
 
 				if sErr.SigninURL != "" {
 					fmt.Printf(ConnectInstructions, sErr.SigninURL)
@@ -1477,7 +1477,7 @@ func SigninHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		var aErr api.AuthorizationError
 		if errors.As(err, &aErr) && aErr.StatusCode == http.StatusUnauthorized {
-			fmt.Println("You need to be signed in to Ollama to run Cloud models.")
+			fmt.Println("You need to be signed in to Loom to run Cloud models.")
 			fmt.Println()
 
 			if aErr.SigninURL != "" {
@@ -1508,7 +1508,7 @@ func SignoutHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		var aErr api.AuthorizationError
 		if errors.As(err, &aErr) && aErr.StatusCode == http.StatusUnauthorized {
-			fmt.Println("You are not signed in to ollama.com")
+			fmt.Println("You are not signed in to loom.com")
 			fmt.Println()
 			return nil
 		} else {
@@ -1516,7 +1516,7 @@ func SignoutHandler(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Println("You have signed out of ollama.com")
+	fmt.Println("You have signed out of loom.com")
 	fmt.Println()
 	return nil
 }
@@ -1533,12 +1533,12 @@ func PushHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	n := model.ParseName(args[0])
-	if strings.HasSuffix(n.Host, ".ollama.ai") || strings.HasSuffix(n.Host, ".ollama.com") {
+	if strings.HasSuffix(n.Host, ".loom.ai") || strings.HasSuffix(n.Host, ".loom.com") {
 		_, err := client.Whoami(cmd.Context())
 		if err != nil {
 			var aErr api.AuthorizationError
 			if errors.As(err, &aErr) && aErr.StatusCode == http.StatusUnauthorized {
-				fmt.Println("You need to be signed in to push models to ollama.com.")
+				fmt.Println("You need to be signed in to push models to loom.com.")
 				fmt.Println()
 
 				if aErr.SigninURL != "" {
@@ -1606,8 +1606,8 @@ func PushHandler(cmd *cobra.Command, args []string) error {
 	spinner.Stop()
 
 	destination := n.String()
-	if strings.HasSuffix(n.Host, ".ollama.ai") || strings.HasSuffix(n.Host, ".ollama.com") {
-		destination = "https://ollama.com/" + strings.TrimSuffix(n.DisplayShortest(), ":latest")
+	if strings.HasSuffix(n.Host, ".loom.ai") || strings.HasSuffix(n.Host, ".loom.com") {
+		destination = "https://loom.com/" + strings.TrimSuffix(n.DisplayShortest(), ":latest")
 	}
 	fmt.Printf("\nYou can find your model at:\n\n")
 	fmt.Printf("\t%s\n", destination)
@@ -2533,17 +2533,6 @@ func RunServer(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	go func() {
-		time.Sleep(1 * time.Second)
-		for {
-			err := notifyCmd.RunE(notifyCmd, nil)
-			if err != nil {
-				time.Sleep(2 * time.Second)
-			} else {
-				break
-			}
-		}
-	}()
 
 	go func() {
 		time.Sleep(2 * time.Second)
@@ -2564,8 +2553,8 @@ func initializeKeypair() error {
 		return err
 	}
 
-	privKeyPath := filepath.Join(home, ".ollama", "id_ed25519")
-	pubKeyPath := filepath.Join(home, ".ollama", "id_ed25519.pub")
+	privKeyPath := filepath.Join(home, ".loom", "id_ed25519")
+	pubKeyPath := filepath.Join(home, ".loom", "id_ed25519.pub")
 
 	_, err = os.Stat(privKeyPath)
 	if os.IsNotExist(err) {
@@ -2628,11 +2617,11 @@ func versionHandler(cmd *cobra.Command, _ []string) {
 
 	serverVersion, err := client.Version(cmd.Context())
 	if err != nil {
-		fmt.Println("Warning: could not connect to a running Ollama instance")
+		fmt.Println("Warning: could not connect to a running Loom instance")
 	}
 
 	if serverVersion != "" {
-		fmt.Printf("ollama version is %s\n", serverVersion)
+		fmt.Printf("loom version is %s\n", serverVersion)
 	}
 
 	if serverVersion != version.Version {
@@ -2668,7 +2657,7 @@ func NewCLI() *cobra.Command {
 	}
 
 	rootCmd := &cobra.Command{
-		Use:           "ollama",
+		Use:           "loom",
 		Short:         "Large language model runner",
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -2712,8 +2701,8 @@ func NewCLI() *cobra.Command {
 
 	memoryCmd := &cobra.Command{
 		Use:   "memory",
-		Short: "Manage the Ollama memory database",
-		Long:  `Export, import, or wipe the Ollama local memory database.`,
+		Short: "Manage the Loom memory database",
+		Long:  `Export, import, or wipe the Loom local memory database.`,
 		Args:  cobra.NoArgs,
 		RunE:  MemoryHandler,
 	}
@@ -2725,7 +2714,7 @@ func NewCLI() *cobra.Command {
 
 	modelCmd := &cobra.Command{
 		Use:   "model",
-		Short: "Manage Ollama models (import or export)",
+		Short: "Manage Loom models (import or export)",
 		Long:  `Import a model from a GGUF file or export an existing model back to a GGUF file.`,
 		Args:  cobra.NoArgs,
 		RunE:  ModelHandler,
@@ -2745,7 +2734,7 @@ func NewCLI() *cobra.Command {
 
 	skillCmd := &cobra.Command{
 		Use:   "skill",
-		Short: "Manage Ollama agent skills (import or export)",
+		Short: "Manage Loom agent skills (import or export)",
 		Long:  `Import agent skills from coding assistants (claude, codex, pi, or custom paths) or export them to a directory.`,
 		Args:  cobra.NoArgs,
 		RunE:  SkillHandler,
@@ -2808,7 +2797,7 @@ func NewCLI() *cobra.Command {
 	serveCmd := &cobra.Command{
 		Use:     "serve",
 		Aliases: []string{"start"},
-		Short:   "Start Ollama",
+		Short:   "Start Loom",
 		Args:    cobra.ExactArgs(0),
 		RunE:    RunServer,
 	}
@@ -2835,7 +2824,7 @@ func NewCLI() *cobra.Command {
 
 	signinCmd := &cobra.Command{
 		Use:     "signin",
-		Short:   "Sign in to ollama.com",
+		Short:   "Sign in to loom.com",
 		Args:    cobra.ExactArgs(0),
 		PreRunE: checkServerHeartbeat,
 		RunE:    SigninHandler,
@@ -2843,7 +2832,7 @@ func NewCLI() *cobra.Command {
 
 	loginCmd := &cobra.Command{
 		Use:     "login",
-		Short:   "Sign in to ollama.com",
+		Short:   "Sign in to loom.com",
 		Hidden:  true,
 		Args:    cobra.ExactArgs(0),
 		PreRunE: checkServerHeartbeat,
@@ -2852,7 +2841,7 @@ func NewCLI() *cobra.Command {
 
 	signoutCmd := &cobra.Command{
 		Use:     "signout",
-		Short:   "Sign out from ollama.com",
+		Short:   "Sign out from loom.com",
 		Args:    cobra.ExactArgs(0),
 		PreRunE: checkServerHeartbeat,
 		RunE:    SignoutHandler,
@@ -2860,7 +2849,7 @@ func NewCLI() *cobra.Command {
 
 	logoutCmd := &cobra.Command{
 		Use:     "logout",
-		Short:   "Sign out from ollama.com",
+		Short:   "Sign out from loom.com",
 		Hidden:  true,
 		Args:    cobra.ExactArgs(0),
 		PreRunE: checkServerHeartbeat,
@@ -2917,18 +2906,16 @@ func NewCLI() *cobra.Command {
 			return discover.RunNativeProbeCommand(cmd.Context(), gpuDiscoverLibDirs, os.Stdout)
 		},
 	}
-	gpuDiscoverCmd.Flags().StringArrayVar(&gpuDiscoverLibDirs, "lib-dir", nil, "Ollama runtime library directory")
+	gpuDiscoverCmd.Flags().StringArrayVar(&gpuDiscoverLibDirs, "lib-dir", nil, "Loom runtime library directory")
 
 	envVars := envconfig.AsMap()
 
-	envs := []envconfig.EnvVar{envVars["OLLAMA_HOST"]}
+	envs := []envconfig.EnvVar{envVars["LOOM_HOST"]}
 
 	for _, cmd := range []*cobra.Command{
 		createCmd,
 		showCmd,
 		runCmd,
-		displayCmd,
-		notifyCmd,
 		debugCmd,
 		stopCmd,
 		pullCmd,
@@ -2945,30 +2932,30 @@ func NewCLI() *cobra.Command {
 		switch cmd {
 		case runCmd:
 			imagegen.AppendFlagsDocs(cmd)
-			appendEnvDocs(cmd, []envconfig.EnvVar{envVars["OLLAMA_EDITOR"], envVars["OLLAMA_HOST"], envVars["OLLAMA_NOHISTORY"]})
+			appendEnvDocs(cmd, []envconfig.EnvVar{envVars["LOOM_EDITOR"], envVars["LOOM_HOST"], envVars["LOOM_NOHISTORY"]})
 		case serveCmd:
 			appendEnvDocs(cmd, []envconfig.EnvVar{
-				envVars["OLLAMA_DEBUG"],
-				envVars["OLLAMA_HOST"],
-				envVars["OLLAMA_CONTEXT_LENGTH"],
-				envVars["OLLAMA_KEEP_ALIVE"],
-				envVars["OLLAMA_MAX_LOADED_MODELS"],
-				envVars["OLLAMA_MAX_TRANSFER_STREAMS"],
-				envVars["OLLAMA_MAX_QUEUE"],
-				envVars["OLLAMA_MODELS"],
-				envVars["OLLAMA_NUM_PARALLEL"],
-				envVars["OLLAMA_NO_CLOUD"],
-				envVars["OLLAMA_NOPRUNE"],
-				envVars["OLLAMA_ORIGINS"],
-				envVars["OLLAMA_SCHED_SPREAD"],
-				envVars["OLLAMA_FLASH_ATTENTION"],
-				envVars["OLLAMA_KV_CACHE_TYPE"],
-				envVars["OLLAMA_LLM_LIBRARY"],
-				envVars["OLLAMA_GPU_OVERHEAD"],
-				envVars["OLLAMA_IGPU_ENABLE"],
+				envVars["LOOM_DEBUG"],
+				envVars["LOOM_HOST"],
+				envVars["LOOM_CONTEXT_LENGTH"],
+				envVars["LOOM_KEEP_ALIVE"],
+				envVars["LOOM_MAX_LOADED_MODELS"],
+				envVars["LOOM_MAX_TRANSFER_STREAMS"],
+				envVars["LOOM_MAX_QUEUE"],
+				envVars["LOOM_MODELS"],
+				envVars["LOOM_NUM_PARALLEL"],
+				envVars["LOOM_NO_CLOUD"],
+				envVars["LOOM_NOPRUNE"],
+				envVars["LOOM_ORIGINS"],
+				envVars["LOOM_SCHED_SPREAD"],
+				envVars["LOOM_FLASH_ATTENTION"],
+				envVars["LOOM_KV_CACHE_TYPE"],
+				envVars["LOOM_LLM_LIBRARY"],
+				envVars["LOOM_GPU_OVERHEAD"],
+				envVars["LOOM_IGPU_ENABLE"],
 				envVars["LLAMA_ARG_FIT"],
 				envVars["LLAMA_ARG_FIT_TARGET"],
-				envVars["OLLAMA_LOAD_TIMEOUT"],
+				envVars["LOOM_LOAD_TIMEOUT"],
 			})
 		default:
 			appendEnvDocs(cmd, envs)
@@ -2980,10 +2967,7 @@ func NewCLI() *cobra.Command {
 		createCmd,
 		showCmd,
 		runCmd,
-		displayCmd,
-		notifyCmd,
 		debugCmd,
-		inputCmd,
 		stopCmd,
 		pullCmd,
 		pushCmd,
@@ -2999,6 +2983,7 @@ func NewCLI() *cobra.Command {
 		gpuDiscoverCmd,
 		memoryCmd,
 		modelCmd,
+		exportDataCmd,
 		skillCmd,
 
 	)

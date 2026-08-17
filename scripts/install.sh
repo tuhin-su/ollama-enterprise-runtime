@@ -1,6 +1,6 @@
 #!/bin/sh
-# This script installs Ollama on Linux and macOS.
-# It detects the current operating system architecture and installs the appropriate version of Ollama.
+# This script installs Loom on Linux and macOS.
+# It detects the current operating system architecture and installs the appropriate version of Loom.
 
 # Wrap script in main function so that a truncated partial download doesn't end
 # up executing half a script.
@@ -39,7 +39,7 @@ case "$ARCH" in
     *) error "Unsupported architecture: $ARCH" ;;
 esac
 
-VER_PARAM="${OLLAMA_VERSION:+?version=$OLLAMA_VERSION}"
+VER_PARAM="${LOOM_VERSION:+?version=$LOOM_VERSION}"
 
 ###########################################
 # macOS
@@ -55,40 +55,40 @@ if [ "$OS" = "Darwin" ]; then
         exit 1
     fi
 
-    DOWNLOAD_URL="https://ollama.com/download/Ollama-darwin.zip${VER_PARAM}"
+    DOWNLOAD_URL="https://loom.com/download/Loom-darwin.zip${VER_PARAM}"
 
-    if pgrep -x Ollama >/dev/null 2>&1; then
-        status "Stopping running Ollama instance..."
-        pkill -x Ollama 2>/dev/null || true
+    if pgrep -x Loom >/dev/null 2>&1; then
+        status "Stopping running Loom instance..."
+        pkill -x Loom 2>/dev/null || true
         sleep 2
     fi
 
-    if [ -d "/Applications/Ollama.app" ]; then
-        status "Removing existing Ollama installation..."
-        rm -rf "/Applications/Ollama.app"
+    if [ -d "/Applications/Loom.app" ]; then
+        status "Removing existing Loom installation..."
+        rm -rf "/Applications/Loom.app"
     fi
 
-    status "Downloading Ollama for macOS..."
+    status "Downloading Loom for macOS..."
     curl --fail --show-error --location --progress-bar \
-        -o "$TEMP_DIR/Ollama-darwin.zip" "$DOWNLOAD_URL"
+        -o "$TEMP_DIR/Loom-darwin.zip" "$DOWNLOAD_URL"
 
-    status "Installing Ollama to /Applications..."
-    unzip -q "$TEMP_DIR/Ollama-darwin.zip" -d "$TEMP_DIR"
-    mv "$TEMP_DIR/Ollama.app" "/Applications/"
+    status "Installing Loom to /Applications..."
+    unzip -q "$TEMP_DIR/Loom-darwin.zip" -d "$TEMP_DIR"
+    mv "$TEMP_DIR/Loom.app" "/Applications/"
 
-    if [ ! -L "/usr/local/bin/ollama" ] || [ "$(readlink "/usr/local/bin/ollama")" != "/Applications/Ollama.app/Contents/Resources/ollama" ]; then
-        status "Adding 'ollama' command to PATH (may require password)..."
+    if [ ! -L "/usr/local/bin/loom" ] || [ "$(readlink "/usr/local/bin/loom")" != "/Applications/Loom.app/Contents/Resources/loom" ]; then
+        status "Adding 'loom' command to PATH (may require password)..."
         mkdir -p "/usr/local/bin" 2>/dev/null || sudo mkdir -p "/usr/local/bin"
-        ln -sf "/Applications/Ollama.app/Contents/Resources/ollama" "/usr/local/bin/ollama" 2>/dev/null || \
-            sudo ln -sf "/Applications/Ollama.app/Contents/Resources/ollama" "/usr/local/bin/ollama"
+        ln -sf "/Applications/Loom.app/Contents/Resources/loom" "/usr/local/bin/loom" 2>/dev/null || \
+            sudo ln -sf "/Applications/Loom.app/Contents/Resources/loom" "/usr/local/bin/loom"
     fi
 
-    if [ -z "${OLLAMA_NO_START:-}" ]; then
-        status "Starting Ollama..."
-        open -a Ollama --args hidden
+    if [ -z "${LOOM_NO_START:-}" ]; then
+        status "Starting Loom..."
+        open -a Loom --args hidden
     fi
 
-    status "Install complete. You can now run 'ollama'."
+    status "Install complete. You can now run 'loom'."
     exit 0
 fi
 
@@ -159,68 +159,68 @@ download_and_extract() {
 for BINDIR in /usr/local/bin /usr/bin /bin; do
     echo $PATH | grep -q $BINDIR && break || continue
 done
-OLLAMA_INSTALL_DIR=$(dirname ${BINDIR})
+LOOM_INSTALL_DIR=$(dirname ${BINDIR})
 
-if [ -d "$OLLAMA_INSTALL_DIR/lib/ollama" ] ; then
-    status "Cleaning up old version at $OLLAMA_INSTALL_DIR/lib/ollama"
-    $SUDO rm -rf "$OLLAMA_INSTALL_DIR/lib/ollama"
+if [ -d "$LOOM_INSTALL_DIR/lib/loom" ] ; then
+    status "Cleaning up old version at $LOOM_INSTALL_DIR/lib/loom"
+    $SUDO rm -rf "$LOOM_INSTALL_DIR/lib/loom"
 fi
-status "Installing ollama to $OLLAMA_INSTALL_DIR"
+status "Installing loom to $LOOM_INSTALL_DIR"
 $SUDO install -o0 -g0 -m755 -d $BINDIR
-$SUDO install -o0 -g0 -m755 -d "$OLLAMA_INSTALL_DIR/lib/ollama"
-download_and_extract "https://ollama.com/download" "$OLLAMA_INSTALL_DIR" "ollama-linux-${ARCH}"
+$SUDO install -o0 -g0 -m755 -d "$LOOM_INSTALL_DIR/lib/loom"
+download_and_extract "https://loom.com/download" "$LOOM_INSTALL_DIR" "loom-linux-${ARCH}"
 
-if [ "$OLLAMA_INSTALL_DIR/bin/ollama" != "$BINDIR/ollama" ] ; then
-    status "Making ollama accessible in the PATH in $BINDIR"
-    $SUDO ln -sf "$OLLAMA_INSTALL_DIR/ollama" "$BINDIR/ollama"
+if [ "$LOOM_INSTALL_DIR/bin/loom" != "$BINDIR/loom" ] ; then
+    status "Making loom accessible in the PATH in $BINDIR"
+    $SUDO ln -sf "$LOOM_INSTALL_DIR/loom" "$BINDIR/loom"
 fi
 
 # Check for NVIDIA JetPack systems with additional downloads
 if [ -f /etc/nv_tegra_release ] ; then
     if grep R36 /etc/nv_tegra_release > /dev/null ; then
-        download_and_extract "https://ollama.com/download" "$OLLAMA_INSTALL_DIR" "ollama-linux-${ARCH}-jetpack6"
+        download_and_extract "https://loom.com/download" "$LOOM_INSTALL_DIR" "loom-linux-${ARCH}-jetpack6"
     elif grep R35 /etc/nv_tegra_release > /dev/null ; then
-        download_and_extract "https://ollama.com/download" "$OLLAMA_INSTALL_DIR" "ollama-linux-${ARCH}-jetpack5"
+        download_and_extract "https://loom.com/download" "$LOOM_INSTALL_DIR" "loom-linux-${ARCH}-jetpack5"
     else
         warning "Unsupported JetPack version detected.  GPU may not be supported"
     fi
 fi
 
 install_success() {
-    status 'The Ollama API is now available at 127.0.0.1:11434.'
-    status 'Install complete. Run "ollama" from the command line.'
+    status 'The Loom API is now available at 127.0.0.1:11434.'
+    status 'Install complete. Run "loom" from the command line.'
 }
 trap install_success EXIT
 
 # Everything from this point onwards is optional.
 
 configure_systemd() {
-    if ! id ollama >/dev/null 2>&1; then
-        status "Creating ollama user..."
-        $SUDO useradd -r -s /bin/false -U -m -d /usr/share/ollama ollama
+    if ! id loom >/dev/null 2>&1; then
+        status "Creating loom user..."
+        $SUDO useradd -r -s /bin/false -U -m -d /usr/share/loom loom
     fi
     if getent group render >/dev/null 2>&1; then
-        status "Adding ollama user to render group..."
-        $SUDO usermod -a -G render ollama
+        status "Adding loom user to render group..."
+        $SUDO usermod -a -G render loom
     fi
     if getent group video >/dev/null 2>&1; then
-        status "Adding ollama user to video group..."
-        $SUDO usermod -a -G video ollama
+        status "Adding loom user to video group..."
+        $SUDO usermod -a -G video loom
     fi
 
-    status "Adding current user to ollama group..."
-    $SUDO usermod -a -G ollama $(whoami)
+    status "Adding current user to loom group..."
+    $SUDO usermod -a -G loom $(whoami)
 
-    status "Creating ollama systemd service..."
-    cat <<EOF | $SUDO tee /etc/systemd/system/ollama.service >/dev/null
+    status "Creating loom systemd service..."
+    cat <<EOF | $SUDO tee /etc/systemd/system/loom.service >/dev/null
 [Unit]
-Description=Ollama Service
+Description=Loom Service
 After=network-online.target
 
 [Service]
-ExecStart=$BINDIR/ollama serve
-User=ollama
-Group=ollama
+ExecStart=$BINDIR/loom serve
+User=loom
+Group=loom
 Restart=always
 RestartSec=3
 Environment="PATH=$PATH"
@@ -231,11 +231,11 @@ EOF
     SYSTEMCTL_RUNNING="$(systemctl is-system-running || true)"
     case $SYSTEMCTL_RUNNING in
         running|degraded)
-            status "Enabling and starting ollama service..."
+            status "Enabling and starting loom service..."
             $SUDO systemctl daemon-reload
-            $SUDO systemctl enable ollama
+            $SUDO systemctl enable loom
 
-            start_service() { $SUDO systemctl restart ollama; }
+            start_service() { $SUDO systemctl restart loom; }
             trap start_service EXIT
             ;;
         *)
@@ -298,12 +298,12 @@ fi
 
 if ! check_gpu lspci nvidia && ! check_gpu lshw nvidia && ! check_gpu lspci amdgpu && ! check_gpu lshw amdgpu; then
     install_success
-    warning "No NVIDIA/AMD GPU detected. Ollama will run in CPU-only mode."
+    warning "No NVIDIA/AMD GPU detected. Loom will run in CPU-only mode."
     exit 0
 fi
 
 if check_gpu lspci amdgpu || check_gpu lshw amdgpu; then
-    download_and_extract "https://ollama.com/download" "$OLLAMA_INSTALL_DIR" "ollama-linux-${ARCH}-rocm"
+    download_and_extract "https://loom.com/download" "$LOOM_INSTALL_DIR" "loom-linux-${ARCH}-rocm"
 
     install_success
     status "AMD GPU ready."

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 type Nemotron3NanoRenderer struct{}

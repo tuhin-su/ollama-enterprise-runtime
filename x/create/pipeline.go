@@ -57,7 +57,7 @@ func Create(modelName, modelDir, quantize string, store BlobStore, writeManifest
 	return nil
 }
 
-const mediaTypeImageJSON = "application/vnd.ollama.image.json"
+const mediaTypeImageJSON = "application/vnd.loom.image.json"
 
 // importConfigBlobs writes every .json in modelDir (except the shard index) as an
 // image.json blob, prefixing each blob name with namePrefix, and returns the

@@ -1,5 +1,5 @@
 // Package memory provides a native high-performance long-term memory system
-// for Ollama. It persists user facts, project context, conversation summaries,
+// for Loom. It persists user facts, project context, conversation summaries,
 // episodic events, and semantic embeddings across sessions.
 package memory
 
@@ -21,20 +21,26 @@ const (
 
 // Memory is the fundamental unit of persistent knowledge.
 type Memory struct {
-	ID           string     `json:"id"`
-	UserID       string     `json:"user_id"`
-	Type         MemoryType `json:"type"`
-	Content      string     `json:"content"`
-	Summary      string     `json:"summary,omitempty"`
-	Importance   float64    `json:"importance"`
-	Embedding    []float32  `json:"embedding,omitempty"`
-	Tags         []string   `json:"tags,omitempty"`
-	AccessCount  int64      `json:"access_count"`
-	Pinned       bool       `json:"pinned"`
-	Archived     bool       `json:"archived"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	LastAccessed time.Time  `json:"last_accessed"`
+	ID           string            `json:"id"`
+	UserID       string            `json:"user_id"`
+	TenantID     string            `json:"tenant_id,omitempty"`
+	Type         MemoryType        `json:"type"`
+	Content      string            `json:"content"`
+	Summary      string            `json:"summary,omitempty"`
+	Source       string            `json:"source,omitempty"`
+	PageNumber   int               `json:"page_number,omitempty"`
+	StartLine    int               `json:"start_line,omitempty"`
+	EndLine      int               `json:"end_line,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	Importance   float64           `json:"importance"`
+	Embedding    []float32         `json:"embedding,omitempty"`
+	Tags         []string          `json:"tags,omitempty"`
+	AccessCount  int64             `json:"access_count"`
+	Pinned       bool              `json:"pinned"`
+	Archived     bool              `json:"archived"`
+	CreatedAt    time.Time         `json:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at"`
+	LastAccessed time.Time         `json:"last_accessed"`
 }
 
 // Conversation represents a chat history turn.
@@ -89,13 +95,17 @@ type ListOptions struct {
 	Offset   int
 }
 
-// SearchOptions controls semantic search parameters.
+// SearchOptions controls semantic and hybrid search parameters.
 type SearchOptions struct {
-	Query               string
-	TopK                int
-	SimilarityThreshold float64
-	Type                MemoryType
-	IncludeArchived     bool
+	Query               string            `json:"query"`
+	TopK                int               `json:"top_k"`
+	SimilarityThreshold float64           `json:"similarity_threshold"`
+	Type                MemoryType        `json:"type,omitempty"`
+	TenantID            string            `json:"tenant_id,omitempty"`
+	SourceFilter        string            `json:"source_filter,omitempty"`
+	MetadataFilter      map[string]string `json:"metadata_filter,omitempty"`
+	EnableHybrid        bool              `json:"enable_hybrid"`
+	IncludeArchived     bool              `json:"include_archived"`
 }
 
 // MemoryRequest carries all context needed to process a single turn.

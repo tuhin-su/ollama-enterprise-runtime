@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/d4l3k/go-bfloat16"
-	"github.com/ollama/ollama/fs/ggml"
+	"github.com/loom/loom/fs/ggml"
 )
 
 func boolPtr(v bool) *bool {

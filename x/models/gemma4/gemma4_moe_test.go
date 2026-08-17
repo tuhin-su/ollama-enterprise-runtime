@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/mlxrunner/mlx"
 )
 
 func useMLXTestThread(t *testing.T) {

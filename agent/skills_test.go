@@ -38,7 +38,7 @@ func writeImportFixtureSkill(t *testing.T, dir string) {
 
 func TestDiscoverAndLoadSkills(t *testing.T) {
 	dir := t.TempDir()
-	writeCatalogSkill(t, dir, "release-notes", "---\nname: release-notes\ndescription: Draft concise release notes.\nmetadata:\n  author: Ollama\n  labels:\n    - release\n    - docs\n---\n# Release notes\n\nUse short bullets.")
+	writeCatalogSkill(t, dir, "release-notes", "---\nname: release-notes\ndescription: Draft concise release notes.\nmetadata:\n  author: Loom\n  labels:\n    - release\n    - docs\n---\n# Release notes\n\nUse short bullets.")
 	catalog, err := DiscoverSkills(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -118,7 +118,7 @@ func TestLoadDefaultSkillsContinuesAfterBadRoot(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	project := t.TempDir()
-	writeCatalogSkill(t, filepath.Join(project, ".ollama", "skills"), "release-notes", "project instructions")
+	writeCatalogSkill(t, filepath.Join(project, ".loom", "skills"), "release-notes", "project instructions")
 
 	badRoot := filepath.Join(t.TempDir(), "not-a-directory")
 	if err := os.WriteFile(badRoot, []byte("not a directory"), 0o644); err != nil {
@@ -213,16 +213,16 @@ func TestSkillsDirUsesOverrideAndXDG(t *testing.T) {
 	t.Setenv(SkillsDirEnv, "")
 	xdg := filepath.Join(base, "xdg")
 	t.Setenv("XDG_CONFIG_HOME", xdg)
-	if got, err := SkillsDir(); err != nil || got != filepath.Join(xdg, "ollama", "skills") {
-		t.Fatalf("SkillsDir xdg = %q, want %q, %v", got, filepath.Join(xdg, "ollama", "skills"), err)
+	if got, err := SkillsDir(); err != nil || got != filepath.Join(xdg, "loom", "skills") {
+		t.Fatalf("SkillsDir xdg = %q, want %q, %v", got, filepath.Join(xdg, "loom", "skills"), err)
 	}
 
 	t.Setenv("XDG_CONFIG_HOME", "")
 	home := filepath.Join(base, "home")
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	if got, err := SkillsDir(); err != nil || got != filepath.Join(home, ".ollama", "skills") {
-		t.Fatalf("SkillsDir default = %q, want %q, %v", got, filepath.Join(home, ".ollama", "skills"), err)
+	if got, err := SkillsDir(); err != nil || got != filepath.Join(home, ".loom", "skills") {
+		t.Fatalf("SkillsDir default = %q, want %q, %v", got, filepath.Join(home, ".loom", "skills"), err)
 	}
 }
 
@@ -231,38 +231,38 @@ func TestLoadDefaultSkillsPrecedenceAndCollisions(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home) // Windows: os.UserHomeDir uses %USERPROFILE%
 
-	userOllama := t.TempDir()
-	t.Setenv(SkillsDirEnv, userOllama)
+	userLoom := t.TempDir()
+	t.Setenv(SkillsDirEnv, userLoom)
 
 	userAgents := filepath.Join(home, ".agents", "skills")
 	project := t.TempDir()
 	projectAgents := filepath.Join(project, ".agents", "skills")
-	projectOllama := filepath.Join(project, ".ollama", "skills")
+	projectLoom := filepath.Join(project, ".loom", "skills")
 
-	// release-notes exists in all four roots; project ollama must win.
+	// release-notes exists in all four roots; project loom must win.
 	writeCatalogSkill(t, userAgents, "release-notes", "from user agents")
-	writeCatalogSkill(t, userOllama, "release-notes", "from user ollama")
-	writeCatalogSkill(t, projectOllama, "release-notes", "from project ollama")
-	// code-review exists in both project roots; project ollama beats project agents.
+	writeCatalogSkill(t, userLoom, "release-notes", "from user loom")
+	writeCatalogSkill(t, projectLoom, "release-notes", "from project loom")
+	// code-review exists in both project roots; project loom beats project agents.
 	writeCatalogSkill(t, projectAgents, "code-review", "from project agents")
-	writeCatalogSkill(t, projectOllama, "code-review", "from project ollama")
-	// unique appears only in user ollama (via env override).
-	writeCatalogSkill(t, userOllama, "unique", "only here")
+	writeCatalogSkill(t, projectLoom, "code-review", "from project loom")
+	// unique appears only in user loom (via env override).
+	writeCatalogSkill(t, userLoom, "unique", "only here")
 
 	catalog, err := LoadDefaultSkills(project)
 	if err != nil {
 		t.Fatal(err)
 	}
 	rn, err := catalog.Load("release-notes")
-	if err != nil || !strings.Contains(rn.Instructions, "from project ollama") || !strings.Contains(rn.Path, ".ollama") {
-		t.Fatalf("release-notes = %#v, want project ollama to win", rn)
+	if err != nil || !strings.Contains(rn.Instructions, "from project loom") || !strings.Contains(rn.Path, ".loom") {
+		t.Fatalf("release-notes = %#v, want project loom to win", rn)
 	}
 	cr, err := catalog.Load("code-review")
-	if err != nil || !strings.Contains(cr.Instructions, "from project ollama") {
-		t.Fatalf("code-review = %#v, want project ollama to win over project agents", cr)
+	if err != nil || !strings.Contains(cr.Instructions, "from project loom") {
+		t.Fatalf("code-review = %#v, want project loom to win over project agents", cr)
 	}
 	if _, err := catalog.Load("unique"); err != nil {
-		t.Fatalf("unique should load from user ollama: %v", err)
+		t.Fatalf("unique should load from user loom: %v", err)
 	}
 	// Collisions are resolved silently by precedence — no diagnostics.
 	for _, d := range catalog.Diagnostics() {

@@ -13,8 +13,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/ollama/ollama/fs"
-	fsgguf "github.com/ollama/ollama/fs/gguf"
+	"github.com/loom/loom/fs"
+	fsgguf "github.com/loom/loom/fs/gguf"
 	"golang.org/x/sync/errgroup"
 )
 

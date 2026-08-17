@@ -1,26 +1,26 @@
-# Ollama Server API Communication Contract
+# Loom Server API Communication Contract
 
-This document defines the interface and protocol contract for any external tool, script, application, or agent (such as [chat.py](file:///home/master/Desktop/ollama-master/chat.py)) communicating with the Ollama server.
+This document defines the interface and protocol contract for any external tool, script, application, or agent (such as [chat.py](file:///home/master/Desktop/loom-master/chat.py)) communicating with the Loom server.
 
 ---
 
 ## 1. Connection Details
 
 ### A. Host & Port
-By default, the Ollama server binds to the localhost interface on port `11434`.
+By default, the Loom server binds to the localhost interface on port `11434`.
 - **Default Endpoint URL:** `http://127.0.0.1:11434` or `http://localhost:11434`
-- **Environment Override:** The environment variable `OLLAMA_HOST` can be set to specify a custom host address and port (e.g. `OLLAMA_HOST=0.0.0.0:11434` or a remote host ip/port).
+- **Environment Override:** The environment variable `LOOM_HOST` can be set to specify a custom host address and port (e.g. `LOOM_HOST=0.0.0.0:11434` or a remote host ip/port).
 
 ### B. Health Verification
 Before initiating main chat/generation requests, clients should check server availability:
 - **Endpoint:** `GET /`
-- **Response:** `200 OK` (returns text `"Ollama is running"`)
+- **Response:** `200 OK` (returns text `"Loom is running"`)
 
 ---
 
 ## 2. Authentication & Headers
 
-If Token Authentication is configured on the Ollama server (enabled by setting `api_token` in `~/.ollama/server.json`), the following rules apply:
+If Token Authentication is configured on the Loom server (enabled by setting `api_token` in `~/.loom/server.json`), the following rules apply:
 
 - **Required Header:** Every API request must carry a Bearer token.
   ```http

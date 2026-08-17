@@ -1,8 +1,8 @@
 package server
 
 import (
-	"github.com/ollama/ollama/internal/modelref"
-	"github.com/ollama/ollama/types/model"
+	"github.com/loom/loom/internal/modelref"
+	"github.com/loom/loom/types/model"
 )
 
 type modelSource = modelref.ModelSource
@@ -26,7 +26,7 @@ type parsedModelRef struct {
 	// Example: "gpt-oss:20b:cloud" -> "gpt-oss:20b".
 	Base string
 	// Name is Base parsed as a fully-qualified model.Name with defaults applied.
-	// Example: "registry.ollama.ai/library/gpt-oss:20b".
+	// Example: "registry.loom.ai/library/gpt-oss:20b".
 	Name model.Name
 	// Source captures explicit source intent from the original input.
 	// Example: "gpt-oss:20b:cloud" -> modelSourceCloud.

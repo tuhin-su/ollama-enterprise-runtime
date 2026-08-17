@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ollama/ollama/agent"
+	"github.com/loom/loom/agent"
 )
 
 func TestEditReplacesUniqueText(t *testing.T) {

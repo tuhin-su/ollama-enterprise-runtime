@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ollama/ollama/manifest"
-	"github.com/ollama/ollama/parser"
-	"github.com/ollama/ollama/types/model"
-	"github.com/ollama/ollama/x/create"
+	"github.com/loom/loom/manifest"
+	"github.com/loom/loom/parser"
+	"github.com/loom/loom/types/model"
+	"github.com/loom/loom/x/create"
 )
 
 func TestModelfileConfig(t *testing.T) {
@@ -165,13 +165,13 @@ func TestModelfileConfig_PartialFields(t *testing.T) {
 	}
 }
 
-func TestMinOllamaVersion(t *testing.T) {
+func TestMinLoomVersion(t *testing.T) {
 	// Verify the minimum version constant is set
-	if MinOllamaVersion == "" {
-		t.Error("MinOllamaVersion should not be empty")
+	if MinLoomVersion == "" {
+		t.Error("MinLoomVersion should not be empty")
 	}
-	if MinOllamaVersion != "0.19.0" {
-		t.Errorf("MinOllamaVersion = %q, want %q", MinOllamaVersion, "0.19.0")
+	if MinLoomVersion != "0.19.0" {
+		t.Errorf("MinLoomVersion = %q, want %q", MinLoomVersion, "0.19.0")
 	}
 }
 
@@ -424,7 +424,7 @@ func TestInferSafetensorsCapabilities(t *testing.T) {
 }
 
 func TestCreateModelfileLayersIncludesParameters(t *testing.T) {
-	t.Setenv("OLLAMA_MODELS", t.TempDir())
+	t.Setenv("LOOM_MODELS", t.TempDir())
 
 	layers, err := createModelfileLayers(&ModelfileConfig{
 		Parameters: map[string]any{
@@ -440,8 +440,8 @@ func TestCreateModelfileLayersIncludesParameters(t *testing.T) {
 		t.Fatalf("len(layers) = %d, want 1", len(layers))
 	}
 
-	if layers[0].MediaType != "application/vnd.ollama.image.params" {
-		t.Fatalf("MediaType = %q, want %q", layers[0].MediaType, "application/vnd.ollama.image.params")
+	if layers[0].MediaType != "application/vnd.loom.image.params" {
+		t.Fatalf("MediaType = %q, want %q", layers[0].MediaType, "application/vnd.loom.image.params")
 	}
 
 	blobPath, err := manifest.BlobsPath(layers[0].Digest)
@@ -465,7 +465,7 @@ func TestCreateModelfileLayersIncludesParameters(t *testing.T) {
 }
 
 func TestNewManifestWriter_PopulatesFileTypeFromQuantize(t *testing.T) {
-	t.Setenv("OLLAMA_MODELS", t.TempDir())
+	t.Setenv("LOOM_MODELS", t.TempDir())
 
 	opts := CreateOptions{
 		ModelName: "test-quantized",
@@ -505,7 +505,7 @@ func TestNewManifestWriter_PopulatesFileTypeFromQuantize(t *testing.T) {
 }
 
 func TestNewManifestWriter_PopulatesDraftMetadata(t *testing.T) {
-	t.Setenv("OLLAMA_MODELS", t.TempDir())
+	t.Setenv("LOOM_MODELS", t.TempDir())
 
 	draftDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(draftDir, "config.json"), []byte(`{"architectures":["DFlashDraftModel"],"model_type":"qwen3"}`), 0o644); err != nil {

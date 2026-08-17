@@ -22,7 +22,7 @@ jobs:
       - name: Set environment
         id: goflags
         run: |
-          echo GOFLAGS="'-ldflags=-w -s \"-X=github.com/ollama/ollama/version.Version=${GITHUB_REF_NAME#v}\" \"-X=github.com/ollama/ollama/server.mode=release\"'" | tee -a $GITHUB_OUTPUT
+          echo GOFLAGS="'-ldflags=-w -s \"-X=github.com/loom/loom/version.Version=${GITHUB_REF_NAME#v}\" \"-X=github.com/loom/loom/server.mode=release\"'" | tee -a $GITHUB_OUTPUT
           echo VERSION="${GITHUB_REF_NAME#v}" | tee -a $GITHUB_OUTPUT
           echo vendorsha=$(cat LLAMA_CPP_VERSION)-$(cat MLX_VERSION)-$(cat MLX_C_VERSION) | tee -a $GITHUB_OUTPUT
 
@@ -294,8 +294,8 @@ jobs:
           ./scripts/build_windows.ps1 @steps
         env:
           CMAKE_GENERATOR: Ninja
-          OLLAMA_BUILD_PARALLEL: ${{ matrix.build-parallel || '' }}
-          OLLAMA_CMAKE_CUDA_FLAGS: ${{ matrix.cmake-cuda-flags || '' }}
+          LOOM_BUILD_PARALLEL: ${{ matrix.build-parallel || '' }}
+          LOOM_CMAKE_CUDA_FLAGS: ${{ matrix.cmake-cuda-flags || '' }}
       - name: Log build results
         run: |
           gci -path .\dist -Recurse -File | ForEach-Object { get-filehash -path $_.FullName -Algorithm SHA256 } | format-list
@@ -305,8 +305,8 @@ jobs:
         run: |
           set -euo pipefail
           for payload in \
-            dist/windows-amd64/lib/ollama/llama-server.exe \
-            dist/windows-arm64/lib/ollama/llama-server.exe
+            dist/windows-amd64/lib/loom/llama-server.exe \
+            dist/windows-arm64/lib/loom/llama-server.exe
           do
             [ -f "$payload" ] || { echo "missing $payload"; exit 1; }
           done
@@ -359,14 +359,14 @@ jobs:
         with:
           node-version: "20"
       - run: |
-          ./scripts/build_windows ollama ollamaArm64 app appArm64
+          ./scripts/build_windows loom loomArm64 app appArm64
       - name: Verify Windows build payloads
         shell: bash
         run: |
           set -euo pipefail
           for payload in \
-            dist/windows-amd64/ollama.exe \
-            dist/windows-arm64/ollama.exe
+            dist/windows-amd64/loom.exe \
+            dist/windows-arm64/loom.exe
           do
             [ -f "$payload" ] || { echo "missing $payload"; exit 1; }
           done
@@ -391,7 +391,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
         with:
-          project_id: ollama
+          project_id: loom
           credentials_json: ${{ secrets.GOOGLE_SIGNING_CREDENTIALS }}
       - run: |
           $ErrorActionPreference = "Stop"
@@ -402,7 +402,7 @@ jobs:
           Expand-Archive -Path "${{ runner.temp }}\plugin.zip" -DestinationPath "${{ runner.temp }}\plugin\"
           & "${{ runner.temp }}\plugin\*\kmscng.msi" /quiet
 
-          echo "${{ vars.OLLAMA_CERT }}" >ollama_inc.crt
+          echo "${{ vars.LOOM_CERT }}" >loom_inc.crt
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -429,10 +429,10 @@ jobs:
         run: |
           set -euo pipefail
           for payload in \
-            dist/windows-amd64/ollama.exe \
-            dist/windows-amd64/lib/ollama/llama-server.exe \
-            dist/windows-arm64/ollama.exe \
-            dist/windows-arm64/lib/ollama/llama-server.exe
+            dist/windows-amd64/loom.exe \
+            dist/windows-amd64/lib/loom/llama-server.exe \
+            dist/windows-arm64/loom.exe \
+            dist/windows-arm64/lib/loom/llama-server.exe
           do
             [ -f "$payload" ] || { echo "missing $payload"; exit 1; }
           done
@@ -447,7 +447,7 @@ jobs:
           path: |
             dist/*.zip
             dist/*.ps1
-            dist/OllamaSetup.exe
+            dist/LoomSetup.exe
 
   linux-depends:
     strategy:
@@ -519,14 +519,14 @@ jobs:
             GOFLAGS=${{ env.GOFLAGS }}
             CGO_CFLAGS=${{ env.CGO_CFLAGS }}
             CGO_CXXFLAGS=${{ env.CGO_CXXFLAGS }}
-            OLLAMA_MLX_BUILD_JOBS=16
-            OLLAMA_MLX_NVCC_THREADS=6
+            LOOM_MLX_BUILD_JOBS=16
+            LOOM_MLX_NVCC_THREADS=6
             APT_MIRROR=http://azure.archive.ubuntu.com/ubuntu
             APT_PORTS_MIRROR=http://azure.ports.ubuntu.com/ubuntu-ports
           cache-from: |
-            type=registry,ref=ollama/release:cache-${{ matrix.arch }}-${{ matrix.target }}
+            type=registry,ref=loom/release:cache-${{ matrix.arch }}-${{ matrix.target }}
             type=registry,ref=${{ vars.DOCKER_REPO }}:latest
-          cache-to: type=registry,ref=ollama/release:cache-${{ matrix.arch }}-${{ matrix.target }},mode=max
+          cache-to: type=registry,ref=loom/release:cache-${{ matrix.arch }}-${{ matrix.target }},mode=max
 
   # Build each Docker variant (OS, arch, and flavor) separately. Using QEMU is unreliable and slower.
   # Heavy stages were pre-built by linux-depends; this job is cache-hit-only for those layers
@@ -545,14 +545,14 @@ jobs:
               GOFLAGS
               APT_MIRROR=http://azure.archive.ubuntu.com/ubuntu
               APT_PORTS_MIRROR=http://azure.ports.ubuntu.com/ubuntu-ports
-              OLLAMA_MLX_BUILD_JOBS=16
-              OLLAMA_MLX_NVCC_THREADS=6
+              LOOM_MLX_BUILD_JOBS=16
+              LOOM_MLX_NVCC_THREADS=6
             cache-from: |
-              type=registry,ref=ollama/release:cache-arm64-llama-server-cpu
-              type=registry,ref=ollama/release:cache-arm64-llama-server-cuda_v12
-              type=registry,ref=ollama/release:cache-arm64-llama-server-cuda_v13
-              type=registry,ref=ollama/release:cache-arm64-jetpack-5
-              type=registry,ref=ollama/release:cache-arm64-jetpack-6
+              type=registry,ref=loom/release:cache-arm64-llama-server-cpu
+              type=registry,ref=loom/release:cache-arm64-llama-server-cuda_v12
+              type=registry,ref=loom/release:cache-arm64-llama-server-cuda_v13
+              type=registry,ref=loom/release:cache-arm64-jetpack-5
+              type=registry,ref=loom/release:cache-arm64-jetpack-6
               type=registry,ref=${{ vars.DOCKER_REPO }}:latest
           - os: linux
             arch: amd64
@@ -563,15 +563,15 @@ jobs:
               GOFLAGS
               APT_MIRROR=http://azure.archive.ubuntu.com/ubuntu
               APT_PORTS_MIRROR=http://azure.ports.ubuntu.com/ubuntu-ports
-              OLLAMA_MLX_BUILD_JOBS=16
-              OLLAMA_MLX_NVCC_THREADS=6
+              LOOM_MLX_BUILD_JOBS=16
+              LOOM_MLX_NVCC_THREADS=6
             cache-from: |
-              type=registry,ref=ollama/release:cache-amd64-llama-server-cpu
-              type=registry,ref=ollama/release:cache-amd64-llama-server-cuda_v12
-              type=registry,ref=ollama/release:cache-amd64-llama-server-cuda_v13
-              type=registry,ref=ollama/release:cache-amd64-mlx
-              type=registry,ref=ollama/release:cache-amd64-llama-server-rocm_v7_2
-              type=registry,ref=ollama/release:cache-amd64-llama-server-vulkan
+              type=registry,ref=loom/release:cache-amd64-llama-server-cpu
+              type=registry,ref=loom/release:cache-amd64-llama-server-cuda_v12
+              type=registry,ref=loom/release:cache-amd64-llama-server-cuda_v13
+              type=registry,ref=loom/release:cache-amd64-mlx
+              type=registry,ref=loom/release:cache-amd64-llama-server-rocm_v7_2
+              type=registry,ref=loom/release:cache-amd64-llama-server-vulkan
               type=registry,ref=${{ vars.DOCKER_REPO }}:latest
           - os: linux
             arch: amd64
@@ -584,11 +584,11 @@ jobs:
               FLAVOR=rocm
               APT_MIRROR=http://azure.archive.ubuntu.com/ubuntu
               APT_PORTS_MIRROR=http://azure.ports.ubuntu.com/ubuntu-ports
-              OLLAMA_MLX_BUILD_JOBS=16
-              OLLAMA_MLX_NVCC_THREADS=6
+              LOOM_MLX_BUILD_JOBS=16
+              LOOM_MLX_NVCC_THREADS=6
             cache-from: |
-              type=registry,ref=ollama/release:cache-amd64-llama-server-cpu
-              type=registry,ref=ollama/release:cache-amd64-llama-server-rocm_v7_2
+              type=registry,ref=loom/release:cache-amd64-llama-server-cpu
+              type=registry,ref=loom/release:cache-amd64-llama-server-rocm_v7_2
               type=registry,ref=${{ vars.DOCKER_REPO }}:latest
     runs-on: ${{ matrix.arch == 'arm64' && format('{0}-{1}', matrix.os, matrix.arch) || matrix.os }}
     environment: release
@@ -641,29 +641,29 @@ jobs:
           set -euo pipefail
           base="dist/${{ matrix.os }}-${{ matrix.arch }}"
           for payload in \
-            "$base/bin/ollama" \
-            "$base/lib/ollama/llama-server"
+            "$base/bin/loom" \
+            "$base/lib/loom/llama-server"
           do
             [ -f "$payload" ] || { echo "missing $payload"; exit 1; }
           done
       - run: |
-          for COMPONENT in bin/* lib/ollama/*; do
+          for COMPONENT in bin/* lib/loom/*; do
             case "$COMPONENT" in
-              bin/ollama*)               echo $COMPONENT >>ollama-${{ matrix.os }}-${{ matrix.arch }}.tar.in ;;
-              lib/ollama/*.so*)          echo $COMPONENT >>ollama-${{ matrix.os }}-${{ matrix.arch }}.tar.in ;;
-              lib/ollama/llama-server*|lib/ollama/llama-quantize*)  echo $COMPONENT >>ollama-${{ matrix.os }}-${{ matrix.arch }}.tar.in ;;
-              lib/ollama/cuda_v*)        echo $COMPONENT >>ollama-${{ matrix.os }}-${{ matrix.arch }}.tar.in ;;
-              lib/ollama/vulkan*)        echo $COMPONENT >>ollama-${{ matrix.os }}-${{ matrix.arch }}.tar.in ;;
-              lib/ollama/mlx*)           echo $COMPONENT >>ollama-${{ matrix.os }}-${{ matrix.arch }}-mlx.tar.in ;;
-              lib/ollama/include*)       echo $COMPONENT >>ollama-${{ matrix.os }}-${{ matrix.arch }}-mlx.tar.in ;;
-              lib/ollama/cuda_jetpack5)  echo $COMPONENT >>ollama-${{ matrix.os }}-${{ matrix.arch }}-jetpack5.tar.in ;;
-              lib/ollama/cuda_jetpack6)  echo $COMPONENT >>ollama-${{ matrix.os }}-${{ matrix.arch }}-jetpack6.tar.in ;;
-              lib/ollama/rocm_v*)        echo $COMPONENT >>ollama-${{ matrix.os }}-${{ matrix.arch }}-rocm.tar.in ;;
+              bin/loom*)               echo $COMPONENT >>loom-${{ matrix.os }}-${{ matrix.arch }}.tar.in ;;
+              lib/loom/*.so*)          echo $COMPONENT >>loom-${{ matrix.os }}-${{ matrix.arch }}.tar.in ;;
+              lib/loom/llama-server*|lib/loom/llama-quantize*)  echo $COMPONENT >>loom-${{ matrix.os }}-${{ matrix.arch }}.tar.in ;;
+              lib/loom/cuda_v*)        echo $COMPONENT >>loom-${{ matrix.os }}-${{ matrix.arch }}.tar.in ;;
+              lib/loom/vulkan*)        echo $COMPONENT >>loom-${{ matrix.os }}-${{ matrix.arch }}.tar.in ;;
+              lib/loom/mlx*)           echo $COMPONENT >>loom-${{ matrix.os }}-${{ matrix.arch }}-mlx.tar.in ;;
+              lib/loom/include*)       echo $COMPONENT >>loom-${{ matrix.os }}-${{ matrix.arch }}-mlx.tar.in ;;
+              lib/loom/cuda_jetpack5)  echo $COMPONENT >>loom-${{ matrix.os }}-${{ matrix.arch }}-jetpack5.tar.in ;;
+              lib/loom/cuda_jetpack6)  echo $COMPONENT >>loom-${{ matrix.os }}-${{ matrix.arch }}-jetpack6.tar.in ;;
+              lib/loom/rocm_v*)        echo $COMPONENT >>loom-${{ matrix.os }}-${{ matrix.arch }}-rocm.tar.in ;;
             esac
           done
         working-directory: dist/${{ matrix.os }}-${{ matrix.arch }}
       - if: matrix.suffix == '-rocm'
-        run: rm -f dist/${{ matrix.os }}-${{ matrix.arch }}/ollama-${{ matrix.os }}-${{ matrix.arch }}.tar.in
+        run: rm -f dist/${{ matrix.os }}-${{ matrix.arch }}/loom-${{ matrix.os }}-${{ matrix.arch }}.tar.in
       - run: |
           echo "Manifests"
           for ARCHIVE in dist/${{ matrix.os }}-${{ matrix.arch }}/*.tar.in ; do
@@ -741,11 +741,11 @@ jobs:
       - name: Verify release artifacts
         run: |
           required=(
-            dist/OllamaSetup.exe
+            dist/LoomSetup.exe
             dist/install.ps1
             dist/install.sh
-            dist/ollama-windows-amd64.zip
-            dist/ollama-windows-arm64.zip
+            dist/loom-windows-amd64.zip
+            dist/loom-windows-arm64.zip
           )
           for payload in "${required[@]}"; do
             if [ ! -f "$payload" ]; then

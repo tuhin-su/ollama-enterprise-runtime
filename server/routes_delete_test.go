@@ -9,16 +9,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/manifest"
-	"github.com/ollama/ollama/types/model"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/manifest"
+	"github.com/loom/loom/types/model"
 )
 
 func TestDelete(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	p := t.TempDir()
-	t.Setenv("OLLAMA_MODELS", p)
+	t.Setenv("LOOM_MODELS", p)
 
 	var s Server
 
@@ -43,8 +43,8 @@ func TestDelete(t *testing.T) {
 	}
 
 	checkFileExists(t, filepath.Join(p, "manifests", "*", "*", "*", "*"), []string{
-		filepath.Join(p, "manifests", "registry.ollama.ai", "library", "test", "latest"),
-		filepath.Join(p, "manifests", "registry.ollama.ai", "library", "test2", "latest"),
+		filepath.Join(p, "manifests", "registry.loom.ai", "library", "test", "latest"),
+		filepath.Join(p, "manifests", "registry.loom.ai", "library", "test2", "latest"),
 	})
 
 	checkFileExists(t, filepath.Join(p, "blobs", "*"), []string{
@@ -61,7 +61,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	checkFileExists(t, filepath.Join(p, "manifests", "*", "*", "*", "*"), []string{
-		filepath.Join(p, "manifests", "registry.ollama.ai", "library", "test2", "latest"),
+		filepath.Join(p, "manifests", "registry.loom.ai", "library", "test2", "latest"),
 	})
 
 	checkFileExists(t, filepath.Join(p, "blobs", "*"), []string{
@@ -84,7 +84,7 @@ func TestDeleteDuplicateLayers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	p := t.TempDir()
-	t.Setenv("OLLAMA_MODELS", p)
+	t.Setenv("LOOM_MODELS", p)
 	var s Server
 
 	n := model.ParseName("test")
@@ -116,7 +116,7 @@ func TestDeleteCloudSourceNormalizesToLegacyName(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	p := t.TempDir()
-	t.Setenv("OLLAMA_MODELS", p)
+	t.Setenv("LOOM_MODELS", p)
 
 	var s Server
 
@@ -130,7 +130,7 @@ func TestDeleteCloudSourceNormalizesToLegacyName(t *testing.T) {
 	}
 
 	checkFileExists(t, filepath.Join(p, "manifests", "*", "*", "*", "*"), []string{
-		filepath.Join(p, "manifests", "registry.ollama.ai", "library", "gpt-oss", "20b-cloud"),
+		filepath.Join(p, "manifests", "registry.loom.ai", "library", "gpt-oss", "20b-cloud"),
 	})
 
 	w = createRequest(t, s.DeleteHandler, api.DeleteRequest{Name: "gpt-oss:20b:cloud"})

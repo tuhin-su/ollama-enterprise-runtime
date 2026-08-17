@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ollama/ollama/x/imagegen/cache"
-	"github.com/ollama/ollama/x/imagegen/manifest"
-	"github.com/ollama/ollama/x/imagegen/mlx"
-	"github.com/ollama/ollama/x/imagegen/tokenizer"
-	"github.com/ollama/ollama/x/imagegen/vae"
+	"github.com/loom/loom/x/imagegen/cache"
+	"github.com/loom/loom/x/imagegen/manifest"
+	"github.com/loom/loom/x/imagegen/mlx"
+	"github.com/loom/loom/x/imagegen/tokenizer"
+	"github.com/loom/loom/x/imagegen/vae"
 )
 
 // GenerateConfig holds all options for image generation.
@@ -43,7 +43,7 @@ type Model struct {
 	qkvFused    bool // Track if QKV has been fused (do only once)
 }
 
-// Load loads the Z-Image model from ollama blob storage.
+// Load loads the Z-Image model from loom blob storage.
 func (m *Model) Load(modelName string) error {
 	fmt.Printf("Loading Z-Image model from manifest: %s...\n", modelName)
 	start := time.Now()

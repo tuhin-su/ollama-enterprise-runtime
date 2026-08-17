@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ollama/ollama/agent"
-	"github.com/ollama/ollama/api"
-	internalcloud "github.com/ollama/ollama/internal/cloud"
+	"github.com/loom/loom/agent"
+	"github.com/loom/loom/api"
+	internalcloud "github.com/loom/loom/internal/cloud"
 )
 
 const (
@@ -19,7 +19,7 @@ const (
 	webFetchTimeout         = 30 * time.Second
 )
 
-var ErrWebAuthRequired = errors.New("Not authenticated. Run `ollama signin` and try again.")
+var ErrWebAuthRequired = errors.New("Not authenticated. Run `loom signin` and try again.")
 
 type WebSearch struct{}
 

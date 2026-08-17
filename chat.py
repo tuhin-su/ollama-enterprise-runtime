@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-chat.py — Interactive CLI demo showing how Ollama's chat API works with
+chat.py — Interactive CLI demo showing how Loom's chat API works with
           the native long-term memory system and RAG tools.
 
 Usage:
@@ -59,8 +59,8 @@ def encode_image(image_path: str) -> str:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
 
-# ── Ollama API Client ────────────────────────────────────────────────────────
-class OllamaClient:
+# ── Loom API Client ────────────────────────────────────────────────────────
+class LoomClient:
     def __init__(self, host: str, token: Optional[str] = None):
         self.host    = host.rstrip("/")
         self.session = requests.Session()
@@ -168,7 +168,7 @@ def print_banner():
   ███    ███ ███    ███     ███    ███     ███       
   ████████▀   ▀█    █▀      ███    █▀     ▄███▀      
                                                      
-    ⚡ Ollama AI Runtime & Autonomous Agent Shell ⚡
+    ⚡ Loom AI Runtime & Autonomous Agent Shell ⚡
     """
     if HAS_RICH:
         console.print(Panel(Text(banner_text, style="bold cyan", justify="center"), border_style="blue", box=ROUNDED))
@@ -200,11 +200,11 @@ def print_info_panel(model: str, args: argparse.Namespace, tools: list[str]):
     console.print(Panel(table, title="[bold white]Runtime Context[/bold white]", border_style="blue", expand=False))
 
 
-def select_model_interactive(client: OllamaClient) -> str:
+def select_model_interactive(client: LoomClient) -> str:
     """Prompts the user to select an available model from the server registry."""
     models = client.list_models()
     if not models:
-        rprint("[bold red]✗ No local models found. Please pull a model first (e.g. 'ollama pull llama3.2')[/bold red]")
+        rprint("[bold red]✗ No local models found. Please pull a model first (e.g. 'loom pull llama3.2')[/bold red]")
         sys.exit(1)
 
     if not HAS_RICH:
@@ -287,17 +287,17 @@ def print_history(messages: list[dict]):
 
 # ── Main Chat Loop ────────────────────────────────────────────────────────────
 def chat_loop(args: argparse.Namespace):
-    client = OllamaClient(args.host, args.token)
+    client = LoomClient(args.host, args.token)
     
     print_banner()
 
     # Health check
     if not client.check_health():
         if HAS_RICH:
-            console.print(f"[bold red]✗ Cannot reach Ollama runtime at {args.host}[/bold red]")
-            console.print("[dim]  Please verify that your server is running ('ollama serve')[/dim]")
+            console.print(f"[bold red]✗ Cannot reach Loom runtime at {args.host}[/bold red]")
+            console.print("[dim]  Please verify that your server is running ('loom serve')[/dim]")
         else:
-            print(f"✗ Cannot reach Ollama runtime at {args.host}")
+            print(f"✗ Cannot reach Loom runtime at {args.host}")
         sys.exit(1)
 
     # Fallback to empty model to allow server-side resolution
@@ -474,7 +474,7 @@ def chat_loop(args: argparse.Namespace):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Ollama Developer Shell with RAG & tool execution support",
+        description="Loom Developer Shell with RAG & tool execution support",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -483,11 +483,11 @@ Examples:
   python chat.py --system "You are a code debugging assistant."
         """,
     )
-    parser.add_argument("--host",      default=os.getenv("OLLAMA_HOST", DEFAULT_HOST),
-                        help="Ollama server URL (default: %(default)s)")
-    parser.add_argument("--model",     default=os.getenv("OLLAMA_MODEL", ""),
+    parser.add_argument("--host",      default=os.getenv("LOOM_HOST", DEFAULT_HOST),
+                        help="Loom server URL (default: %(default)s)")
+    parser.add_argument("--model",     default=os.getenv("LOOM_MODEL", ""),
                         help="Model to use (default: interactive selection)")
-    parser.add_argument("--token",     default=os.getenv("OLLAMA_TOKEN", ""),
+    parser.add_argument("--token",     default=os.getenv("LOOM_TOKEN", ""),
                         help="Bearer token if api_token is configured")
     parser.add_argument("--user",      default="",
                         help="Informational User ID metadata label")

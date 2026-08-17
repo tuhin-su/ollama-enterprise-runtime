@@ -13,7 +13,7 @@ func init() {
 		if err != nil {
 			return
 		}
-		logPath := filepath.Join(home, ".ollama", "debug.log")
+		logPath := filepath.Join(home, ".loom", "debug.log")
 		os.MkdirAll(filepath.Dir(logPath), 0755)
 		
 		// Truncate on start

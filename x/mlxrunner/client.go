@@ -21,13 +21,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/envconfig"
-	"github.com/ollama/ollama/format"
-	"github.com/ollama/ollama/llm"
-	"github.com/ollama/ollama/ml"
-	"github.com/ollama/ollama/x/imagegen"
-	"github.com/ollama/ollama/x/imagegen/manifest"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/envconfig"
+	"github.com/loom/loom/format"
+	"github.com/loom/loom/llm"
+	"github.com/loom/loom/ml"
+	"github.com/loom/loom/x/imagegen"
+	"github.com/loom/loom/x/imagegen/manifest"
 )
 
 // Client wraps an MLX runner subprocess to implement llm.LlamaServer for LLM models.
@@ -305,7 +305,7 @@ func (c *Client) Load(ctx context.Context, _ ml.SystemInfo, gpus []ml.DeviceInfo
 		exe = eval
 	}
 
-	// Spawn subprocess: ollama runner --mlx-engine --model <name> --port <port>
+	// Spawn subprocess: loom runner --mlx-engine --model <name> --port <port>
 	cmd := exec.Command(exe, "runner", "--mlx-engine", "--model", c.modelName, "--port", strconv.Itoa(port))
 	cmd.Env = os.Environ()
 
@@ -320,8 +320,8 @@ func (c *Client) Load(ctx context.Context, _ ml.SystemInfo, gpus []ml.DeviceInfo
 	}
 
 	if libPathEnvVar != "" {
-		libraryPaths := []string{ml.LibOllamaPath}
-		if mlxDirs, err := filepath.Glob(filepath.Join(ml.LibOllamaPath, "mlx_*")); err == nil {
+		libraryPaths := []string{ml.LibLoomPath}
+		if mlxDirs, err := filepath.Glob(filepath.Join(ml.LibLoomPath, "mlx_*")); err == nil {
 			libraryPaths = append(libraryPaths, mlxDirs...)
 		}
 
@@ -353,7 +353,7 @@ func (c *Client) Load(ctx context.Context, _ ml.SystemInfo, gpus []ml.DeviceInfo
 	// MLX resolves headers via $CUDA_PATH/include/*.h (and checks CUDA_HOME first).
 	// Always use bundled headers to avoid version mismatches with any
 	// system-installed CUDA toolkit.
-	if mlxDirs, err := filepath.Glob(filepath.Join(ml.LibOllamaPath, "mlx_cuda_*")); err == nil {
+	if mlxDirs, err := filepath.Glob(filepath.Join(ml.LibLoomPath, "mlx_cuda_*")); err == nil {
 		for _, d := range mlxDirs {
 			if _, err := os.Stat(filepath.Join(d, "include")); err == nil {
 				setEnv(cmd, "CUDA_PATH", d)

@@ -13,7 +13,7 @@ func setupTokenAuthTestRouter(token string) *gin.Engine {
 	r := gin.New()
 
 	// Simulate what tokenAuthMiddleware does but with an explicit token
-	// so we don't need to touch ~/.ollama/server.json during tests.
+	// so we don't need to touch ~/.loom/server.json during tests.
 	r.Use(func(c *gin.Context) {
 		if token == "" {
 			c.Next()
@@ -36,7 +36,7 @@ func setupTokenAuthTestRouter(token string) *gin.Engine {
 		c.Next()
 	})
 
-	r.GET("/", func(c *gin.Context) { c.String(http.StatusOK, "Ollama is running") })
+	r.GET("/", func(c *gin.Context) { c.String(http.StatusOK, "Loom is running") })
 	r.GET("/api/tags", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"models": []string{}}) })
 
 	return r

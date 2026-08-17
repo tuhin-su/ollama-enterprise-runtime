@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/fs/ggml"
-	"github.com/ollama/ollama/llm"
-	"github.com/ollama/ollama/ml"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/fs/ggml"
+	"github.com/loom/loom/llm"
+	"github.com/loom/loom/ml"
 )
 
 func getTestTools() []api.Tool {

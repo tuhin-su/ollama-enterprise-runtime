@@ -1,6 +1,6 @@
 package cache
 
-import "github.com/ollama/ollama/x/imagegen/mlx"
+import "github.com/loom/loom/x/imagegen/mlx"
 
 type Cache interface {
 	Update(k, v *mlx.Array, seqLen int) (*mlx.Array, *mlx.Array)

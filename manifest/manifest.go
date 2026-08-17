@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ollama/ollama/types/model"
+	"github.com/loom/loom/types/model"
 )
 
 type Manifest struct {
@@ -43,7 +43,7 @@ func (m *Manifest) FileInfo() os.FileInfo {
 // ReadConfigJSON reads and unmarshals a config layer as JSON.
 func (m *Manifest) ReadConfigJSON(configPath string, v any) error {
 	for _, layer := range m.Layers {
-		if layer.MediaType == "application/vnd.ollama.image.json" && layer.Name == configPath {
+		if layer.MediaType == "application/vnd.loom.image.json" && layer.Name == configPath {
 			blobPath, err := BlobsPath(layer.Digest)
 			if err != nil {
 				return err

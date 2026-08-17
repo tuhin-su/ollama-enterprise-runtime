@@ -27,14 +27,14 @@ func TestStatus(t *testing.T) {
 		},
 		{
 			name:          "config only",
-			configContent: `{"disable_ollama_cloud": true}`,
+			configContent: `{"disable_loom_cloud": true}`,
 			disabled:      true,
 			source:        "config",
 		},
 		{
 			name:          "both",
 			envValue:      "1",
-			configContent: `{"disable_ollama_cloud": true}`,
+			configContent: `{"disable_loom_cloud": true}`,
 			disabled:      true,
 			source:        "both",
 		},
@@ -50,7 +50,7 @@ func TestStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			home := t.TempDir()
 			if tt.configContent != "" {
-				configPath := filepath.Join(home, ".ollama", "server.json")
+				configPath := filepath.Join(home, ".loom", "server.json")
 				if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
 					t.Fatal(err)
 				}
@@ -60,7 +60,7 @@ func TestStatus(t *testing.T) {
 			}
 
 			setTestHome(t, home)
-			t.Setenv("OLLAMA_NO_CLOUD", tt.envValue)
+			t.Setenv("LOOM_NO_CLOUD", tt.envValue)
 
 			disabled, source := Status()
 			if disabled != tt.disabled {

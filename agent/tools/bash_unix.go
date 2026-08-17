@@ -22,7 +22,7 @@ func shellCommandDescription() string {
 }
 
 func newBashCommand(ctx context.Context, command, cwdPath string) *exec.Cmd {
-	script := command + "\n__ollama_status=$?\npwd -P > " + shellQuote(cwdPath) + "\nexit $__ollama_status"
+	script := command + "\n__loom_status=$?\npwd -P > " + shellQuote(cwdPath) + "\nexit $__loom_status"
 	cmd := exec.CommandContext(ctx, "bash", "-c", script)
 	configureBashCommand(cmd)
 	return cmd

@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/envconfig"
-	"github.com/ollama/ollama/format"
-	"github.com/ollama/ollama/fs/ggml"
-	"github.com/ollama/ollama/ml"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/envconfig"
+	"github.com/loom/loom/format"
+	"github.com/loom/loom/fs/ggml"
+	"github.com/loom/loom/ml"
 )
 
 var ErrLoadRequiredFull = errors.New("unable to load full model on GPU")

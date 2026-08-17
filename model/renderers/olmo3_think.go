@@ -3,7 +3,7 @@ package renderers
 import (
 	"strings"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 type Olmo3ThinkVariant int

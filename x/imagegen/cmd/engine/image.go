@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ollama/ollama/x/imagegen/mlx"
+	"github.com/loom/loom/x/imagegen/mlx"
 )
 
 // saveImageArray saves an MLX array as a PNG image.

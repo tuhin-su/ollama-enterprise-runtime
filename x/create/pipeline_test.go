@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	st "github.com/ollama/ollama/x/safetensors"
+	st "github.com/loom/loom/x/safetensors"
 )
 
 func TestCreatePipeline(t *testing.T) {

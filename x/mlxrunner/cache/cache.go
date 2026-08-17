@@ -3,7 +3,7 @@ package cache
 import (
 	"fmt"
 
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/mlxrunner/mlx"
 )
 
 // Cache is common state management shared by every cache kind. Writers

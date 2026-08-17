@@ -14,9 +14,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/ollama/ollama/envconfig"
-	"github.com/ollama/ollama/internal/orderedmap"
-	"github.com/ollama/ollama/types/model"
+	"github.com/loom/loom/envconfig"
+	"github.com/loom/loom/internal/orderedmap"
+	"github.com/loom/loom/types/model"
 )
 
 // StatusError is an error with an HTTP status code and message.
@@ -36,7 +36,7 @@ func (e StatusError) Error() string {
 		return e.ErrorMessage
 	default:
 		// this should not happen
-		return "something went wrong, please see the ollama server logs for details"
+		return "something went wrong, please see the loom server logs for details"
 	}
 }
 
@@ -50,7 +50,7 @@ func (e AuthorizationError) Error() string {
 	if e.Status != "" {
 		return e.Status
 	}
-	return "something went wrong, please see the ollama server logs for details"
+	return "something went wrong, please see the loom server logs for details"
 }
 
 // ImageData represents the raw binary data of an image file.
@@ -60,8 +60,8 @@ type ImageData []byte
 // have to specify the Model and Prompt fields, all the other fields have
 // reasonable defaults for basic uses.
 type GenerateRequest struct {
-	// Model is the model name; it should be a name familiar to Ollama from
-	// the library at https://ollama.com/library
+	// Model is the model name; it should be a name familiar to Loom from
+	// the library at https://loom.com/library
 	Model string `json:"model"`
 
 	// Prompt is the textual prompt to send to the model.
@@ -538,7 +538,7 @@ type ChatResponse struct {
 	// RemoteModel is the name of the upstream model that generated the response.
 	RemoteModel string `json:"remote_model,omitempty"`
 
-	// RemoteHost is the URL of the upstream Ollama host that generated the response.
+	// RemoteHost is the URL of the upstream Loom host that generated the response.
 	RemoteHost string `json:"remote_host,omitempty"`
 
 	// CreatedAt is the timestamp of the response.
@@ -679,7 +679,7 @@ type CreateRequest struct {
 	// From is the name of the model or file to use as the source.
 	From string `json:"from,omitempty"`
 
-	// RemoteHost is the URL of the upstream ollama API for the model (if any).
+	// RemoteHost is the URL of the upstream loom API for the model (if any).
 	RemoteHost string `json:"remote_host,omitempty"`
 
 	// Files is a map of files include when creating the model.
@@ -712,7 +712,7 @@ type CreateRequest struct {
 	// Parser is the name of the parser used to parse the output of the request.
 	Parser   string `json:"parser,omitempty"`
 
-	// Requires is the minimum version of Ollama required by the model.
+	// Requires is the minimum version of Loom required by the model.
 	Requires string `json:"requires,omitempty"`
 
 	// Description is the description of what the model does.
@@ -914,7 +914,7 @@ type GenerateResponse struct {
 	// RemoteModel is the name of the upstream model that generated the response.
 	RemoteModel string `json:"remote_model,omitempty"`
 
-	// RemoteHost is the URL of the upstream Ollama host that generated the response.
+	// RemoteHost is the URL of the upstream Loom host that generated the response.
 	RemoteHost string `json:"remote_host,omitempty"`
 
 	// CreatedAt is the timestamp of the response.

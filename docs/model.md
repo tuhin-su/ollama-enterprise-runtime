@@ -1,11 +1,11 @@
 # Manage Models Command
 
-The `ollama model` command allows you to manage local models in Ollama, specifically supporting importing, exporting, and updating them.
+The `loom model` command allows you to manage local models in Loom, specifically supporting importing, exporting, and updating them.
 
 ## Usage
 
 ```bash
-ollama model [flags]
+loom model [flags]
 ```
 
 ## Available Commands
@@ -15,7 +15,7 @@ ollama model [flags]
 You can import a model from a GGUF file path and optionally give it a description.
 
 ```bash
-ollama model --import /path/to/model.gguf --name my-model:latest --description "An amazing new model."
+loom model --import /path/to/model.gguf --name my-model:latest --description "An amazing new model."
 ```
 * **Flags**:
   * `--import`: Path to the GGUF file.
@@ -27,7 +27,7 @@ ollama model --import /path/to/model.gguf --name my-model:latest --description "
 You can export an existing model to a specified destination.
 
 ```bash
-ollama model --export my-model:latest --dest /path/to/export/dir/
+loom model --export my-model:latest --dest /path/to/export/dir/
 ```
 * **Flags**:
   * `--export`: The name of the model you wish to export.
@@ -38,7 +38,7 @@ ollama model --export my-model:latest --dest /path/to/export/dir/
 You can update properties of an existing model, such as its description, without needing to re-import it.
 
 ```bash
-ollama model --update my-model:latest --update-description "This is my updated description."
+loom model --update my-model:latest --update-description "This is my updated description."
 ```
 * **Flags**:
   * `--update`: The name of the existing model you wish to update.
@@ -48,5 +48,5 @@ ollama model --update my-model:latest --update-description "This is my updated d
 
 For a full list of commands and aliases, use:
 ```bash
-ollama model --help
+loom model --help
 ```

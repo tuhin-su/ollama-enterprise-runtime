@@ -13,16 +13,16 @@ from typing import Dict, Any
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-OLLAMA_WS_URL = "ws://localhost:11434/api/tools/interface"
+LOOM_WS_URL = "ws://localhost:11434/api/tools/interface"
 # Note: globalToolServer.AuthToken is hardcoded to "abc" in server/tool_interface.go
 AUTH_TOKEN = "abc"
 
 async def register_and_run_tool(tool_name: str, tool_schema: Dict[str, Any], handler):
-    """Connects to the Ollama server, registers a tool with its schema, and runs its handler."""
+    """Connects to the Loom server, registers a tool with its schema, and runs its handler."""
     while True:
         try:
-            logger.info(f"Connecting to Ollama tool interface at {OLLAMA_WS_URL} for tool '{tool_name}'...")
-            async with websockets.connect(OLLAMA_WS_URL) as websocket:
+            logger.info(f"Connecting to Loom tool interface at {LOOM_WS_URL} for tool '{tool_name}'...")
+            async with websockets.connect(LOOM_WS_URL) as websocket:
                 # 1. Authenticate and register the tool schema
                 register_msg = {
                     "auth_token": AUTH_TOKEN,

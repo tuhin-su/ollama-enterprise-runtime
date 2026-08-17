@@ -3,7 +3,7 @@ package cache
 import (
 	"testing"
 
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/mlxrunner/mlx"
 )
 
 // distinctKV builds a [1, H, L, D] keys/values pair whose values encode the

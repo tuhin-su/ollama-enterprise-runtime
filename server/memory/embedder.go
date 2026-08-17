@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ollama/ollama/envconfig"
+	"github.com/loom/loom/envconfig"
 )
 
-// OllamaEmbedder implements EmbeddingProvider by calling Ollama's own
+// LoomEmbedder implements EmbeddingProvider by calling Loom's own
 // /api/embed endpoint, so no external embedding service is required.
-type OllamaEmbedder struct {
+type LoomEmbedder struct {
 	model      string
 	baseURL    string
 	client     *http.Client
@@ -31,12 +31,12 @@ type embedResponse struct {
 	Embeddings [][]float32 `json:"embeddings"`
 }
 
-// NewOllamaEmbedder creates an embedder that calls the local Ollama server.
-func NewOllamaEmbedder(model, baseURL string) *OllamaEmbedder {
+// NewLoomEmbedder creates an embedder that calls the local Loom server.
+func NewLoomEmbedder(model, baseURL string) *LoomEmbedder {
 	if baseURL == "" {
 		baseURL = "http://127.0.0.1:11434"
 	}
-	return &OllamaEmbedder{
+	return &LoomEmbedder{
 		model:   model,
 		baseURL: baseURL,
 		client: &http.Client{
@@ -46,7 +46,7 @@ func NewOllamaEmbedder(model, baseURL string) *OllamaEmbedder {
 }
 
 // Embed returns the embedding for a single text.
-func (e *OllamaEmbedder) Embed(ctx context.Context, text string) ([]float32, error) {
+func (e *LoomEmbedder) Embed(ctx context.Context, text string) ([]float32, error) {
 	embeddings, err := e.EmbedBatch(ctx, []string{text})
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (e *OllamaEmbedder) Embed(ctx context.Context, text string) ([]float32, err
 }
 
 // EmbedBatch returns embeddings for multiple texts in a single call.
-func (e *OllamaEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+func (e *LoomEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
 	if len(texts) == 0 {
 		return nil, nil
 	}
@@ -110,7 +110,7 @@ func (e *OllamaEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]fl
 
 // Dimensions returns the embedding dimensionality. Returns 0 until
 // the first successful Embed call.
-func (e *OllamaEmbedder) Dimensions() int {
+func (e *LoomEmbedder) Dimensions() int {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.dimensions

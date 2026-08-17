@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 func createTestFlagOptions() flagOptions {
@@ -75,7 +75,7 @@ type mockServerOptions struct {
 	psResponse        *api.ProcessResponse
 }
 
-func createMockOllamaServer(t *testing.T, opts mockServerOptions) *httptest.Server {
+func createMockLoomServer(t *testing.T, opts mockServerOptions) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -163,12 +163,12 @@ func defaultGenerateResponses() []api.GenerateResponse {
 func TestBenchmarkModel_Success(t *testing.T) {
 	fOpt := createTestFlagOptions()
 
-	server := createMockOllamaServer(t, mockServerOptions{
+	server := createMockLoomServer(t, mockServerOptions{
 		generateResponses: defaultGenerateResponses(),
 	})
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -199,7 +199,7 @@ func TestBenchmarkModel_ServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -246,7 +246,7 @@ func TestBenchmarkModel_Timeout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -263,7 +263,7 @@ func TestBenchmarkModel_Timeout(t *testing.T) {
 func TestBenchmarkModel_NoMetrics(t *testing.T) {
 	fOpt := createTestFlagOptions()
 
-	server := createMockOllamaServer(t, mockServerOptions{
+	server := createMockLoomServer(t, mockServerOptions{
 		generateResponses: []api.GenerateResponse{
 			{
 				Model:    "test-model",
@@ -274,7 +274,7 @@ func TestBenchmarkModel_NoMetrics(t *testing.T) {
 	})
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -344,7 +344,7 @@ func TestBenchmarkModel_MultipleModels(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -423,7 +423,7 @@ func TestBenchmarkModel_WithImage(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -578,7 +578,7 @@ func TestBenchmarkModel_Warmup(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -603,12 +603,12 @@ func TestBenchmarkModel_Warmup(t *testing.T) {
 func TestBenchmarkModel_TTFT(t *testing.T) {
 	fOpt := createTestFlagOptions()
 
-	server := createMockOllamaServer(t, mockServerOptions{
+	server := createMockLoomServer(t, mockServerOptions{
 		generateResponses: defaultGenerateResponses(),
 	})
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -625,7 +625,7 @@ func TestBenchmarkModel_TTFT(t *testing.T) {
 func TestBenchmarkModel_ModelInfo(t *testing.T) {
 	fOpt := createTestFlagOptions()
 
-	server := createMockOllamaServer(t, mockServerOptions{
+	server := createMockLoomServer(t, mockServerOptions{
 		generateResponses: defaultGenerateResponses(),
 		showResponse: &api.ShowResponse{
 			Details: api.ModelDetails{
@@ -637,7 +637,7 @@ func TestBenchmarkModel_ModelInfo(t *testing.T) {
 	})
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -660,7 +660,7 @@ func TestBenchmarkModel_ModelInfo(t *testing.T) {
 func TestBenchmarkModel_VRAM(t *testing.T) {
 	fOpt := createTestFlagOptions()
 
-	server := createMockOllamaServer(t, mockServerOptions{
+	server := createMockLoomServer(t, mockServerOptions{
 		generateResponses: defaultGenerateResponses(),
 		psResponse: &api.ProcessResponse{
 			Models: []api.ProcessModelResponse{
@@ -675,7 +675,7 @@ func TestBenchmarkModel_VRAM(t *testing.T) {
 	})
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -735,7 +735,7 @@ func TestBenchmarkModel_PromptTokens(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -799,7 +799,7 @@ func TestBenchmarkModel_RawMode(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -858,7 +858,7 @@ func TestBenchmarkModel_PromptVariesPerEpoch(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -936,7 +936,7 @@ func TestBenchmarkModel_ShortResponseRetry(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -986,7 +986,7 @@ func TestBenchmarkModel_ShortResponseWarning(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -1049,7 +1049,7 @@ func TestBenchmarkModel_NoRetryWhenMaxTokensZero(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -1069,12 +1069,12 @@ func TestBenchmarkModel_CSVFormat(t *testing.T) {
 	format := "csv"
 	fOpt.format = &format
 
-	server := createMockOllamaServer(t, mockServerOptions{
+	server := createMockLoomServer(t, mockServerOptions{
 		generateResponses: defaultGenerateResponses(),
 	})
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	output := captureOutput(func() {
 		err := BenchmarkModel(fOpt)
@@ -1322,7 +1322,7 @@ func TestFetchMemoryUsage_PrefixMatch(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	client, err := api.ClientFromEnvironment()
 	if err != nil {
@@ -1357,7 +1357,7 @@ func TestFetchMemoryUsage_CPUSpill(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("OLLAMA_HOST", server.URL)
+	t.Setenv("LOOM_HOST", server.URL)
 
 	client, err := api.ClientFromEnvironment()
 	if err != nil {

@@ -1,20 +1,20 @@
-# install.ps1 — Windows installer for tuhin-su/ollama-master
+# install.ps1 — Windows installer for tuhin-su/loom-master
 # Supports: Windows amd64, arm64
 #
 # Usage (run in PowerShell as Administrator):
-#   irm https://raw.githubusercontent.com/tuhin-su/ollama-master/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/tuhin-su/loom-master/main/install.ps1 | iex
 #   $env:VERSION="v1.2.3"; irm ... | iex    # pin a specific version
 
 param(
     [string]$Version = "",
-    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\Ollama"
+    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\Loom"
 )
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "Continue"
 
-$REPO     = "tuhin-su/ollama-master"
-$BINARY   = "ollama.exe"
+$REPO     = "tuhin-su/loom-master"
+$BINARY   = "loom.exe"
 $API_BASE = "https://api.github.com/repos/$REPO"
 $GH_BASE  = "https://github.com/$REPO/releases/download"
 
@@ -81,7 +81,7 @@ function Add-ToUserPath {
     }
 }
 
-function Install-OllamaService {
+function Install-LoomService {
     param($ExePath)
     # Only register Windows service if running as admin
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
@@ -91,7 +91,7 @@ function Install-OllamaService {
         return
     }
 
-    $svcName = "OllamaService"
+    $svcName = "LoomService"
     $existing = Get-Service -Name $svcName -ErrorAction SilentlyContinue
     if ($existing) {
         Write-Info "Stopping existing service..."
@@ -101,10 +101,10 @@ function Install-OllamaService {
     }
 
     Write-Info "Registering Windows service: $svcName"
-    sc.exe create $svcName binPath= "`"$ExePath`" serve" start= auto DisplayName= "Ollama AI Runtime" | Out-Null
-    sc.exe description $svcName "Native high-performance Ollama AI server with long-term memory" | Out-Null
+    sc.exe create $svcName binPath= "`"$ExePath`" serve" start= auto DisplayName= "Loom AI Runtime" | Out-Null
+    sc.exe description $svcName "Native high-performance Loom AI server with long-term memory" | Out-Null
     sc.exe start $svcName | Out-Null
-    Write-Info "Service started. Use 'sc.exe stop OllamaService' to stop."
+    Write-Info "Service started. Use 'sc.exe stop LoomService' to stop."
 }
 
 # ─── Banner ───────────────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ Write-Host " ██║   ██║██║     ██║     ██╔══█
 Write-Host " ╚██████╔╝███████╗███████╗██║  ██║██║ ╚═╝ ██║██║  ██║" -ForegroundColor Blue
 Write-Host "  ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝" -ForegroundColor Blue
 Write-Host ""
-Write-Host "  github.com/tuhin-su/ollama-master" -ForegroundColor Gray
+Write-Host "  github.com/tuhin-su/loom-master" -ForegroundColor Gray
 Write-Host ""
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -127,11 +127,11 @@ Write-Info "Architecture: $arch"
 Write-Info "Version:      v$version"
 Write-Info "Install dir:  $InstallDir"
 
-$assetName    = "ollama-windows-$arch.zip"
+$assetName    = "loom-windows-$arch.zip"
 $assetUrl     = "$GH_BASE/v$version/$assetName"
 $checksumUrl  = "$GH_BASE/v$version/$assetName.sha256"
 
-$tmpDir = Join-Path $env:TEMP "ollama-install-$([System.IO.Path]::GetRandomFileName())"
+$tmpDir = Join-Path $env:TEMP "loom-install-$([System.IO.Path]::GetRandomFileName())"
 New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
 
 try {
@@ -156,16 +156,16 @@ try {
     Write-Info "Installed to: $destBin"
 
     Add-ToUserPath $InstallDir
-    Install-OllamaService $destBin
+    Install-LoomService $destBin
 
     Write-Host ""
-    Write-Success "Ollama v$version installed successfully!"
+    Write-Success "Loom v$version installed successfully!"
     Write-Host ""
     Write-Host "  Quick start:" -ForegroundColor White
-    Write-Host "    ollama serve          # start the server" -ForegroundColor Gray
-    Write-Host "    ollama run gemma4     # run a model" -ForegroundColor Gray
+    Write-Host "    loom serve          # start the server" -ForegroundColor Gray
+    Write-Host "    loom run gemma4     # run a model" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "  Docs: https://github.com/tuhin-su/ollama-master#readme" -ForegroundColor Gray
+    Write-Host "  Docs: https://github.com/tuhin-su/loom-master#readme" -ForegroundColor Gray
     Write-Host ""
 } finally {
     Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue

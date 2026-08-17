@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ollama/ollama/ml"
+	"github.com/loom/loom/ml"
 )
 
 func TestFilterOldCUDADriver(t *testing.T) {

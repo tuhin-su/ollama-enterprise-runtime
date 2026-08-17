@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 // VRAMArbiter arbitrates VRAM usage across concurrent request types (live chat, background task scheduler, and chaining)
@@ -34,7 +34,7 @@ type ToolServer struct {
 }
 
 var globalToolServer = &ToolServer{
-	AuthToken:            "abc", // Matched to ~/.ollama/server.json api_token
+	AuthToken:            "abc", // Matched to ~/.loom/server.json api_token
 	ConnectedTools:       make(map[string]*websocket.Conn),
 	ConnectedToolSchemas: make(map[string]api.Tool),
 	PendingRequests:      make(map[string]*websocket.Conn),

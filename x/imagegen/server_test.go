@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ollama/ollama/llm"
+	"github.com/loom/loom/llm"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

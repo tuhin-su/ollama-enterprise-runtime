@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
-	"github.com/ollama/ollama/x/quant"
+	"github.com/loom/loom/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/quant"
 )
 
 // QuantizeSupported reports whether MLX (and thus quantization) is available.
@@ -49,7 +49,7 @@ func quantizeBlobLocked(items []quantizeItem) ([]byte, error) {
 		mlx.Sweep()
 	}()
 
-	tmpDir, err := os.MkdirTemp("", "ollama-quantize-*")
+	tmpDir, err := os.MkdirTemp("", "loom-quantize-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}

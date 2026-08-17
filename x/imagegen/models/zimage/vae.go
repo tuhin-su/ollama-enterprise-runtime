@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/ollama/ollama/x/imagegen/manifest"
-	"github.com/ollama/ollama/x/imagegen/mlx"
-	"github.com/ollama/ollama/x/imagegen/safetensors"
-	"github.com/ollama/ollama/x/imagegen/vae"
+	"github.com/loom/loom/x/imagegen/manifest"
+	"github.com/loom/loom/x/imagegen/mlx"
+	"github.com/loom/loom/x/imagegen/safetensors"
+	"github.com/loom/loom/x/imagegen/vae"
 )
 
 // VAEConfig holds VAE decoder configuration
@@ -640,7 +640,7 @@ type VAEDecoder struct {
 	Tiling *vae.TilingConfig
 }
 
-// Load loads the VAE decoder from ollama blob storage.
+// Load loads the VAE decoder from loom blob storage.
 func (m *VAEDecoder) Load(modelManifest *manifest.ModelManifest) error {
 	// Load config from blob
 	var cfg VAEConfig

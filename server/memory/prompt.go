@@ -74,7 +74,7 @@ func (b *DefaultPromptBuilder) Build(memories []*SearchResult, systemPrompt stri
 	return ModelFinalPrompt(systemPrompt, contextBlock)
 }
 
-// formatMemoryLine renders a single memory for prompt injection.
+// formatMemoryLine renders a single memory for prompt injection with source citations.
 func formatMemoryLine(mem *Memory, score float64) string {
 	tags := ""
 	if len(mem.Tags) > 0 {
@@ -86,11 +86,28 @@ func formatMemoryLine(mem *Memory, score float64) string {
 		content = mem.Summary
 	}
 
-	return fmt.Sprintf("- [%s|%.0f%%] %s%s",
+	var citationParts []string
+	if mem.Source != "" {
+		citationParts = append(citationParts, "Source: "+mem.Source)
+	}
+	if mem.PageNumber > 0 {
+		citationParts = append(citationParts, fmt.Sprintf("Page: %d", mem.PageNumber))
+	}
+	if mem.StartLine > 0 && mem.EndLine > 0 {
+		citationParts = append(citationParts, fmt.Sprintf("Lines: %d-%d", mem.StartLine, mem.EndLine))
+	}
+
+	citation := ""
+	if len(citationParts) > 0 {
+		citation = fmt.Sprintf(" (%s)", strings.Join(citationParts, " | "))
+	}
+
+	return fmt.Sprintf("- [%s|%.0f%%] %s%s%s",
 		mem.Type,
 		score*100,
 		content,
 		tags,
+		citation,
 	)
 }
 

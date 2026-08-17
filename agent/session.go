@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/internal/modelref"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/internal/modelref"
 )
 
 type ChatClient interface {

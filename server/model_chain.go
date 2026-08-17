@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/llm"
-	"github.com/ollama/ollama/server/memory"
-	"github.com/ollama/ollama/types/model"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/llm"
+	"github.com/loom/loom/server/memory"
+	"github.com/loom/loom/types/model"
 )
 
 // ────────────────────────────────────────────────────────────────────────────

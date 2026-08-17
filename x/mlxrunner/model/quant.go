@@ -1,13 +1,13 @@
 package model
 
 import (
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
-	"github.com/ollama/ollama/x/quant"
+	"github.com/loom/loom/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/quant"
 )
 
 // QuantizationParams returns default groupSize, bits, and mode for a
 // quantization type. The values live in the shared x/quant package so the
-// importer, the runtime loader, and `ollama show` agree on them.
+// importer, the runtime loader, and `loom show` agree on them.
 func QuantizationParams(quantization string) (groupSize, bits int, mode string) {
 	return quant.Params(quantization)
 }

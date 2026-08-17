@@ -15,16 +15,19 @@ import (
 // It wires together the store, cache, vector index, ranker, embedder,
 // extractor, prompt builder, and background worker pool.
 type Engine struct {
-	cfg     Config
-	store   MemoryStore
-	cache   CacheProvider
-	index   VectorIndex
-	ranker  *Ranker
-	embedder EmbeddingProvider
+	cfg       Config
+	store     MemoryStore
+	cache     CacheProvider
+	index     VectorIndex
+	bm25      *BM25Index
+	chunker   *DocumentChunker
+	ranker    *Ranker
+	embedder  EmbeddingProvider
 	extractor MemoryExtractor
-	builder  PromptBuilder
-	decay    *DecayProcessor
-	pool     *WorkerPool
+	builder   PromptBuilder
+	decay     *DecayProcessor
+	ssl       *RuntimeSSLEngine
+	pool      *WorkerPool
 
 	mu      sync.RWMutex
 	started bool
@@ -47,11 +50,14 @@ func NewEngine(cfg Config) (*Engine, error) {
 	}
 
 	index := NewBruteForceIndex()
+	bm25 := NewBM25Index()
+	chunker := NewDocumentChunker()
 	ranker := NewRanker(cfg.Ranking)
-	embedder := NewOllamaEmbedder(cfg.EmbeddingModel, "")
+	embedder := NewLoomEmbedder(cfg.EmbeddingModel, "")
 	extractor := NewPatternExtractor()
 	builder := NewPromptBuilder()
 	decay := NewDecayProcessor(store, index, cache, cfg)
+	ssl := NewRuntimeSSLEngine(embedder)
 	pool := NewWorkerPool(cfg.WorkerCount)
 
 	e := &Engine{
@@ -59,11 +65,14 @@ func NewEngine(cfg Config) (*Engine, error) {
 		store:     store,
 		cache:     cache,
 		index:     index,
+		bm25:      bm25,
+		chunker:   chunker,
 		ranker:    ranker,
 		embedder:  embedder,
 		extractor: extractor,
 		builder:   builder,
 		decay:     decay,
+		ssl:       ssl,
 		pool:      pool,
 	}
 	return e, nil
@@ -136,27 +145,44 @@ func (e *Engine) ProcessRequest(ctx context.Context, req *MemoryRequest) (*Memor
 		return &MemoryResponse{EnrichedSystem: req.SystemPrompt}, nil
 	}
 
-	// Vector search
+	// Vector dense search
 	vecResults, err := e.index.Search(queryEmb, e.cfg.TopK)
 	if err != nil || len(vecResults) == 0 {
 		return &MemoryResponse{EnrichedSystem: req.SystemPrompt}, nil
 	}
 
-	// Filter by similarity threshold
-	var ids []string
+	// BM25 sparse search for exact keyword matching
+	bm25Results := e.bm25.Search(queryText, e.cfg.TopK)
+
+	var denseIDs []string
 	sims := make(map[string]float64, len(vecResults))
 	for _, vr := range vecResults {
 		if vr.Similarity >= e.cfg.SimilarityThreshold {
-			ids = append(ids, vr.ID)
+			denseIDs = append(denseIDs, vr.ID)
 			sims[vr.ID] = vr.Similarity
 		}
 	}
-	if len(ids) == 0 {
+
+	var sparseIDs []string
+	for _, bmr := range bm25Results {
+		sparseIDs = append(sparseIDs, bmr.ID)
+		if _, exists := sims[bmr.ID]; !exists {
+			sims[bmr.ID] = 0.5 // Default baseline similarity score for sparse matches
+		}
+	}
+
+	// Reciprocal Rank Fusion (RRF) to merge vector and sparse search results
+	finalIDs := ReciprocalRankFusion(denseIDs, sparseIDs, 60.0)
+	if len(finalIDs) == 0 {
 		return &MemoryResponse{EnrichedSystem: req.SystemPrompt}, nil
 	}
 
+	if len(finalIDs) > e.cfg.TopK {
+		finalIDs = finalIDs[:e.cfg.TopK]
+	}
+
 	// Fetch memories from store
-	memories, err := e.store.GetByIDs(ctx, ids)
+	memories, err := e.store.GetByIDs(ctx, finalIDs)
 	if err != nil {
 		slog.Warn("memory engine: get_by_ids failed", "error", err)
 		return &MemoryResponse{EnrichedSystem: req.SystemPrompt}, nil
@@ -172,7 +198,7 @@ func (e *Engine) ProcessRequest(ctx context.Context, req *MemoryRequest) (*Memor
 	e.cache.SetWithTTL(cacheKey, results, int64(len(results)), 2*time.Minute)
 
 	// Async: increment access counts
-	memIDs := ids
+	memIDs := finalIDs
 	e.pool.Submit(func() {
 		for _, id := range memIDs {
 			_ = e.store.IncrementAccess(context.Background(), id)
@@ -197,6 +223,9 @@ func (e *Engine) ProcessResponse(ctx context.Context, req *MemoryRequest, respon
 	userMsg := lastUserMessage(req.Messages)
 
 	e.pool.Submit(func() {
+		// Online Self-Supervised Learning (SSL) contrastive gradient step
+		e.ssl.LearnFromTurn(context.Background(), userMsg, response)
+
 		extracted, err := e.extractor.Extract(context.Background(), userMsg, response)
 		if err != nil || len(extracted) == 0 {
 			return
@@ -331,7 +360,7 @@ func minInt(a, b int) int {
 }
 
 // ---------------------------------------------------------------------------
-// LoadConfig reads ~/.ollama/server.json and merges the "memory" section.
+// LoadConfig reads ~/.loom/server.json and merges the "memory" section.
 // ---------------------------------------------------------------------------
 
 type serverJSON struct {
@@ -340,7 +369,8 @@ type serverJSON struct {
 	LogPath      string `json:"log_path"`
 }
 
-// LoadConfig reads the server config and returns a merged memory Config.
+// LoadConfig reads ~/.loom/server.json and merges the "memory" section.
+// If server.json does not exist, it guarantees robust production defaults and creates the default server.json file.
 func LoadConfig() Config {
 	cfg := DefaultConfig()
 
@@ -349,14 +379,30 @@ func LoadConfig() Config {
 		return cfg
 	}
 
-	data, err := os.ReadFile(filepath.Join(home, ".ollama", "server.json"))
+	configDir := filepath.Join(home, ".loom")
+	configFile := filepath.Join(configDir, "server.json")
+
+	data, err := os.ReadFile(configFile)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Auto-generate robust default server.json if missing
+			_ = os.MkdirAll(configDir, 0755)
+			defaultJSON := serverJSON{
+				Memory:       cfg,
+				DefaultModel: cfg.DefaultModel,
+				LogPath:      cfg.LogPath,
+			}
+			if bytes, marshalErr := json.MarshalIndent(defaultJSON, "", "  "); marshalErr == nil {
+				_ = os.WriteFile(configFile, bytes, 0644)
+				slog.Info("memory: auto-generated default configuration", "path", configFile)
+			}
+		}
 		return cfg
 	}
 
 	var sj serverJSON
 	if err := json.Unmarshal(data, &sj); err != nil {
-		slog.Warn("memory: failed to parse server.json", "error", err)
+		slog.Warn("memory: failed to parse server.json, using defaults", "error", err)
 		return cfg
 	}
 

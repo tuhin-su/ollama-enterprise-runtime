@@ -1,6 +1,6 @@
 # Server Configuration
 
-Ollama's server behaviour can be tuned by creating `~/.ollama/server.json`.
+Loom's server behaviour can be tuned by creating `~/.loom/server.json`.
 The file is read at startup and merged with built-in defaults.
 
 ---
@@ -21,13 +21,13 @@ The file is read at startup and merged with built-in defaults.
 
 ## Token Authentication
 
-By default the Ollama API is **unauthenticated** and accessible to anyone who
+By default the Loom API is **unauthenticated** and accessible to anyone who
 can reach the server's port. When `api_token` is set, every API request must
 include a matching `Authorization` header.
 
 ### Setting a token
 
-Add `api_token` to `~/.ollama/server.json`:
+Add `api_token` to `~/.loom/server.json`:
 
 ```json
 {
@@ -35,13 +35,13 @@ Add `api_token` to `~/.ollama/server.json`:
 }
 ```
 
-Restart `ollama serve` for the change to take effect.
+Restart `loom serve` for the change to take effect.
 
 ### How it works
 
 - The server enforces `Authorization: Bearer <token>` on **all** endpoints
   except the health-check (`GET /` and `HEAD /`).
-- The `ollama` CLI reads the same `server.json` file and **automatically**
+- The `loom` CLI reads the same `server.json` file and **automatically**
   attaches the token to every local request — no manual configuration needed.
 - Requests without a valid token receive `401 Unauthorized`.
 
@@ -60,12 +60,12 @@ curl http://localhost:11434/api/chat \
 
 ### Security notes
 
-- The token is stored in plain text in `~/.ollama/server.json`. Protect the
+- The token is stored in plain text in `~/.loom/server.json`. Protect the
   file with appropriate filesystem permissions (`chmod 600`).
 - Token auth is intended for **single-machine** or **LAN** deployments. For
-  internet-facing deployments, put Ollama behind a reverse proxy with TLS.
-- Cloud model requests to `ollama.com` continue to use SSH key authentication
-  (`~/.ollama/id_ed25519`) regardless of the local token setting.
+  internet-facing deployments, put Loom behind a reverse proxy with TLS.
+- Cloud model requests to `loom.com` continue to use SSH key authentication
+  (`~/.loom/id_ed25519`) regardless of the local token setting.
 
 ---
 
@@ -113,7 +113,7 @@ See [memory.md](memory.md) for the full reference.
 |-----|------|---------|-------------|
 | `api_token` | string | `""` | Bearer token for API authentication. Empty = no auth. |
 | `memory.enabled` | bool | `false` | Enable long-term memory system. |
-| `memory.db_path` | string | `~/.ollama/memory.lance` | LanceDB database path. |
+| `memory.db_path` | string | `~/.loom/memory.lance` | LanceDB database path. |
 | `memory.embedding_model` | string | `nomic-embed-text` | Model for generating embeddings. |
 | `memory.top_k` | int | `20` | Vector search candidates before ranking. |
 | `memory.similarity_threshold` | float | `0.65` | Minimum cosine similarity (0–1). |

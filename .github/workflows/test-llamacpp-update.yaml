@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           VERSION="0.0.0-llamacpp-${GITHUB_SHA::7}"
           {
-            echo "GOFLAGS='-ldflags=-w -s \"-X=github.com/ollama/ollama/version.Version=${VERSION}\" \"-X=github.com/ollama/ollama/server.mode=release\"'"
+            echo "GOFLAGS='-ldflags=-w -s \"-X=github.com/loom/loom/version.Version=${VERSION}\" \"-X=github.com/loom/loom/server.mode=release\"'"
             echo "VERSION=${VERSION}"
             echo "vendorsha=$(cat LLAMA_CPP_VERSION)-$(cat MLX_VERSION)-$(cat MLX_C_VERSION)"
           } >>"${GITHUB_OUTPUT}"
@@ -62,8 +62,8 @@ jobs:
         run: ls -l dist/
       - uses: actions/upload-artifact@v4
         with:
-          name: ollama-darwin.tgz
-          path: dist/ollama-darwin.tgz
+          name: loom-darwin.tgz
+          path: dist/loom-darwin.tgz
           compression-level: 0
 
   # Build payload export stages independently and combine the exported
@@ -222,8 +222,8 @@ jobs:
           set -euo pipefail
           base="dist/linux-${{ matrix.arch }}"
           for payload in \
-            "${base}/bin/ollama" \
-            "${base}/lib/ollama/llama-server"
+            "${base}/bin/loom" \
+            "${base}/lib/loom/llama-server"
           do
             [ -f "${payload}" ] || { echo "missing ${payload}"; exit 1; }
           done
@@ -231,18 +231,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for COMPONENT in bin/* lib/ollama/*; do
+          for COMPONENT in bin/* lib/loom/*; do
             case "${COMPONENT}" in
-              bin/ollama*)              echo "${COMPONENT}" >>ollama-linux-${{ matrix.arch }}.tar.in ;;
-              lib/ollama/*.so*)         echo "${COMPONENT}" >>ollama-linux-${{ matrix.arch }}.tar.in ;;
-              lib/ollama/llama-server*|lib/ollama/llama-quantize*) echo "${COMPONENT}" >>ollama-linux-${{ matrix.arch }}.tar.in ;;
-              lib/ollama/cuda_v*)       echo "${COMPONENT}" >>ollama-linux-${{ matrix.arch }}.tar.in ;;
-              lib/ollama/vulkan*)       echo "${COMPONENT}" >>ollama-linux-${{ matrix.arch }}.tar.in ;;
-              lib/ollama/mlx*)          echo "${COMPONENT}" >>ollama-linux-${{ matrix.arch }}-mlx.tar.in ;;
-              lib/ollama/include*)      echo "${COMPONENT}" >>ollama-linux-${{ matrix.arch }}-mlx.tar.in ;;
-              lib/ollama/cuda_jetpack5) echo "${COMPONENT}" >>ollama-linux-${{ matrix.arch }}-jetpack5.tar.in ;;
-              lib/ollama/cuda_jetpack6) echo "${COMPONENT}" >>ollama-linux-${{ matrix.arch }}-jetpack6.tar.in ;;
-              lib/ollama/rocm_v*)       echo "${COMPONENT}" >>ollama-linux-${{ matrix.arch }}-rocm.tar.in ;;
+              bin/loom*)              echo "${COMPONENT}" >>loom-linux-${{ matrix.arch }}.tar.in ;;
+              lib/loom/*.so*)         echo "${COMPONENT}" >>loom-linux-${{ matrix.arch }}.tar.in ;;
+              lib/loom/llama-server*|lib/loom/llama-quantize*) echo "${COMPONENT}" >>loom-linux-${{ matrix.arch }}.tar.in ;;
+              lib/loom/cuda_v*)       echo "${COMPONENT}" >>loom-linux-${{ matrix.arch }}.tar.in ;;
+              lib/loom/vulkan*)       echo "${COMPONENT}" >>loom-linux-${{ matrix.arch }}.tar.in ;;
+              lib/loom/mlx*)          echo "${COMPONENT}" >>loom-linux-${{ matrix.arch }}-mlx.tar.in ;;
+              lib/loom/include*)      echo "${COMPONENT}" >>loom-linux-${{ matrix.arch }}-mlx.tar.in ;;
+              lib/loom/cuda_jetpack5) echo "${COMPONENT}" >>loom-linux-${{ matrix.arch }}-jetpack5.tar.in ;;
+              lib/loom/cuda_jetpack6) echo "${COMPONENT}" >>loom-linux-${{ matrix.arch }}-jetpack6.tar.in ;;
+              lib/loom/rocm_v*)       echo "${COMPONENT}" >>loom-linux-${{ matrix.arch }}-rocm.tar.in ;;
             esac
           done
         working-directory: dist/linux-${{ matrix.arch }}
@@ -264,26 +264,26 @@ jobs:
           wait
       - uses: actions/upload-artifact@v4
         with:
-          name: ollama-linux-${{ matrix.arch }}.tar.zst
-          path: ollama-linux-${{ matrix.arch }}.tar.zst
+          name: loom-linux-${{ matrix.arch }}.tar.zst
+          path: loom-linux-${{ matrix.arch }}.tar.zst
           compression-level: 0
       - if: matrix.arch == 'amd64'
         uses: actions/upload-artifact@v4
         with:
-          name: ollama-linux-amd64-rocm.tar.zst
-          path: ollama-linux-amd64-rocm.tar.zst
+          name: loom-linux-amd64-rocm.tar.zst
+          path: loom-linux-amd64-rocm.tar.zst
           compression-level: 0
       - if: matrix.arch == 'arm64'
         uses: actions/upload-artifact@v4
         with:
-          name: ollama-linux-arm64-jetpack5.tar.zst
-          path: ollama-linux-arm64-jetpack5.tar.zst
+          name: loom-linux-arm64-jetpack5.tar.zst
+          path: loom-linux-arm64-jetpack5.tar.zst
           compression-level: 0
       - if: matrix.arch == 'arm64'
         uses: actions/upload-artifact@v4
         with:
-          name: ollama-linux-arm64-jetpack6.tar.zst
-          path: ollama-linux-arm64-jetpack6.tar.zst
+          name: loom-linux-arm64-jetpack6.tar.zst
+          path: loom-linux-arm64-jetpack6.tar.zst
           compression-level: 0
 
   windows-depends:
@@ -451,8 +451,8 @@ jobs:
         run: |
           set -euo pipefail
           for payload in \
-            dist/windows-amd64/lib/ollama/llama-server.exe \
-            dist/windows-arm64/lib/ollama/llama-server.exe
+            dist/windows-amd64/lib/loom/llama-server.exe \
+            dist/windows-arm64/lib/loom/llama-server.exe
           do
             [ -f "$payload" ] || { echo "missing $payload"; exit 1; }
           done
@@ -505,14 +505,14 @@ jobs:
         with:
           node-version: "20"
       - name: Build Windows binaries and app launchers
-        run: ./scripts/build_windows.ps1 ollama ollamaArm64 app appArm64
+        run: ./scripts/build_windows.ps1 loom loomArm64 app appArm64
       - name: Verify Windows build payloads
         shell: bash
         run: |
           set -euo pipefail
           for payload in \
-            dist/windows-amd64/ollama.exe \
-            dist/windows-arm64/ollama.exe
+            dist/windows-amd64/loom.exe \
+            dist/windows-arm64/loom.exe
           do
             [ -f "$payload" ] || { echo "missing $payload"; exit 1; }
           done
@@ -560,10 +560,10 @@ jobs:
         run: |
           set -euo pipefail
           for payload in \
-            dist/windows-amd64/ollama.exe \
-            dist/windows-amd64/lib/ollama/llama-server.exe \
-            dist/windows-arm64/ollama.exe \
-            dist/windows-arm64/lib/ollama/llama-server.exe
+            dist/windows-amd64/loom.exe \
+            dist/windows-amd64/lib/loom/llama-server.exe \
+            dist/windows-arm64/loom.exe \
+            dist/windows-arm64/lib/loom/llama-server.exe
           do
             [ -f "$payload" ] || { echo "missing $payload"; exit 1; }
           done
@@ -577,33 +577,33 @@ jobs:
         run: |
           set -euo pipefail
           for payload in \
-            dist/ollama-windows-amd64.zip \
-            dist/ollama-windows-arm64.zip \
-            dist/ollama-windows-amd64-rocm.zip \
-            dist/OllamaSetup.exe \
+            dist/loom-windows-amd64.zip \
+            dist/loom-windows-arm64.zip \
+            dist/loom-windows-amd64-rocm.zip \
+            dist/LoomSetup.exe \
             dist/install.ps1
           do
             [ -f "$payload" ] || { echo "missing $payload"; exit 1; }
           done
       - uses: actions/upload-artifact@v4
         with:
-          name: ollama-windows-amd64.zip
-          path: dist/ollama-windows-amd64.zip
+          name: loom-windows-amd64.zip
+          path: dist/loom-windows-amd64.zip
           compression-level: 0
       - uses: actions/upload-artifact@v4
         with:
-          name: ollama-windows-arm64.zip
-          path: dist/ollama-windows-arm64.zip
+          name: loom-windows-arm64.zip
+          path: dist/loom-windows-arm64.zip
           compression-level: 0
       - uses: actions/upload-artifact@v4
         with:
-          name: ollama-windows-amd64-rocm.zip
-          path: dist/ollama-windows-amd64-rocm.zip
+          name: loom-windows-amd64-rocm.zip
+          path: dist/loom-windows-amd64-rocm.zip
           compression-level: 0
       - uses: actions/upload-artifact@v4
         with:
-          name: OllamaSetup.exe
-          path: dist/OllamaSetup.exe
+          name: LoomSetup.exe
+          path: dist/LoomSetup.exe
           compression-level: 0
       - uses: actions/upload-artifact@v4
         with:

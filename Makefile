@@ -3,7 +3,7 @@
 # Target installation directory
 PREFIX ?= /usr/local
 INSTALL_BIN_DIR = $(PREFIX)/bin
-INSTALL_LIB_DIR = $(PREFIX)/lib/ollama
+INSTALL_LIB_DIR = $(PREFIX)/lib/loom
 
 # CGO compilation variables for LanceDB CGO bindings
 export CGO_CFLAGS := -I$(shell pwd)/include
@@ -15,11 +15,11 @@ PARALLEL_JOBS ?= $(shell nproc 2>/dev/null || echo 8)
 all: build
 
 help:
-	@echo "Ollama Master Makefile"
+	@echo "Loom Master Makefile"
 	@echo "Available commands:"
-	@echo "  make build      - Configure and build Ollama & native llama-server payload"
-	@echo "  make install    - Install built ollama binary and native libraries to system (may require sudo)"
-	@echo "  make uninstall  - Remove installed ollama binary and libraries from system (may require sudo)"
+	@echo "  make build      - Configure and build Loom & native llama-server payload"
+	@echo "  make install    - Install built loom binary and native libraries to system (may require sudo)"
+	@echo "  make uninstall  - Remove installed loom binary and libraries from system (may require sudo)"
 	@echo "  make update     - Pull the latest changes from repository and rebuild"
 	@echo "  make clean      - Clean cmake build artifacts"
 
@@ -48,18 +48,18 @@ build: lancedb-bindings
 	@echo ">>> Checking if GPU exists..."
 	@if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then \
 		echo ">>> NVIDIA GPU detected! Configuring with CUDA v13 backend..."; \
-		cmake -B build -DCMAKE_INSTALL_PREFIX=$(PREFIX) -DOLLAMA_LLAMA_BACKENDS=cuda_v13 .; \
+		cmake -B build -DCMAKE_INSTALL_PREFIX=$(PREFIX) -DLOOM_LLAMA_BACKENDS=cuda_v13 .; \
 	else \
 		echo ">>> No GPU detected. Configuring CPU-only build..."; \
 		cmake -B build -DCMAKE_INSTALL_PREFIX=$(PREFIX) .; \
 	fi
 	@echo ">>> Compiling payloads and binary..."
 	cmake --build build --parallel $(PARALLEL_JOBS)
-	@if [ -f build/ollama ]; then cp build/ollama .; fi
-	@echo ">>> Build completed successfully! You can run ./ollama serve or run 'make install'."
+	@if [ -f build/loom ]; then cp build/loom .; fi
+	@echo ">>> Build completed successfully! You can run ./loom serve or run 'make install'."
 
 install:
-	@echo ">>> Installing Ollama to $(PREFIX)..."
+	@echo ">>> Installing Loom to $(PREFIX)..."
 	@if [ -d "build" ]; then \
 		cmake --install build; \
 		echo ">>> Install completed successfully."; \
@@ -69,8 +69,8 @@ install:
 	fi
 
 uninstall:
-	@echo ">>> Uninstalling Ollama from $(PREFIX)..."
-	rm -f $(INSTALL_BIN_DIR)/ollama
+	@echo ">>> Uninstalling Loom from $(PREFIX)..."
+	rm -f $(INSTALL_BIN_DIR)/loom
 	rm -rf $(INSTALL_LIB_DIR)
 	@echo ">>> Uninstall completed successfully."
 
@@ -83,5 +83,5 @@ update:
 clean:
 	@echo ">>> Cleaning build artifacts..."
 	rm -rf build
-	rm -f ollama
+	rm -f loom
 	@echo ">>> Clean completed."

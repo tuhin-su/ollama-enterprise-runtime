@@ -1,13 +1,13 @@
 # Session Engineering Log & Conversation History
 
 **Date:** July 29, 2026  
-**Project:** Ollama Dynamic Agent & RAG Runtime  
-**Workspace:** `/home/master/Desktop/ollama-master`
+**Project:** Loom Dynamic Agent & RAG Runtime  
+**Workspace:** `/home/master/Desktop/loom-master`
 
 ---
 
 ## 1. Executive Summary & Context
-During this engineering session, we addressed key logic holes, bootstrap deadlocks, and critical security vulnerabilities in the Ollama codebase. We transitioned the codebase from a capability-first prototype to a secure, concurrent, and highly robust local AI runtime capable of orchestrating server-side memory and external WebSocket tools dynamically without hanging or deadlocking.
+During this engineering session, we addressed key logic holes, bootstrap deadlocks, and critical security vulnerabilities in the Loom codebase. We transitioned the codebase from a capability-first prototype to a secure, concurrent, and highly robust local AI runtime capable of orchestrating server-side memory and external WebSocket tools dynamically without hanging or deadlocking.
 
 ---
 
@@ -19,7 +19,7 @@ During this engineering session, we addressed key logic holes, bootstrap deadloc
 * **Remediation:** Wired synchronous Go-to-WebSocket bridging in `server/tool_interface.go` using a map of channels (`PendingHTTPRequests`). Modified `routes.go` to intercept both memory tools and connected WebSocket tools, routing them cleanly via `executeToolOrMemory`.
 
 ### Bug 2: Server Startup Bootstrap Deadlock
-* **Symptom:** Starting `./ollama serve` hung indefinitely, causing external tool connections to fail with handshake timeouts.
+* **Symptom:** Starting `./loom serve` hung indefinitely, causing external tool connections to fail with handshake timeouts.
 * **Root Cause:** `InitToolManager` registered built-in memory/chaining tools on startup, which required calculating embeddings. The embedding client made HTTP requests to `/api/embed` on the local port (`11434`). However, the HTTP server had not started listening yet because it was waiting for `InitToolManager` to finish.
 * **Remediation:** Refactored `server/tool_manager.go` to run the `RegisterBuiltinTools` routine in a background goroutine with a 1-second delay, allowing the server to bind port `11434` immediately and break the deadlock.
 
@@ -30,7 +30,7 @@ During this engineering session, we addressed key logic holes, bootstrap deadloc
 
 ### Bug 4: Server-Side Tool JSON Leaked to Client CLI
 * **Symptom:** Chatting with tools returned empty outputs in the CLI.
-* **Root Cause:** When the LLM called a tool, the streaming loop did not suppress the tool call JSON if the tool was not a memory tool. The raw JSON tool call was streamed, which the `ollama` CLI discarded.
+* **Root Cause:** When the LLM called a tool, the streaming loop did not suppress the tool call JSON if the tool was not a memory tool. The raw JSON tool call was streamed, which the `loom` CLI discarded.
 * **Remediation:** Updated the streaming suppression filter to suppress all server-executed tools (memory, WebSocket, and `toolmanager.search`), ensuring the client only receives the final generated text answer.
 
 ### Bug 5: Recursive Read-Lock Deadlocks

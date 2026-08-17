@@ -3,9 +3,9 @@ package cache
 import (
 	"slices"
 
-	"github.com/ollama/ollama/x/mlxrunner/batch"
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
-	"github.com/ollama/ollama/x/models/nn"
+	"github.com/loom/loom/x/mlxrunner/batch"
+	"github.com/loom/loom/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/models/nn"
 )
 
 // Attention is the contract for caches that back attention layers

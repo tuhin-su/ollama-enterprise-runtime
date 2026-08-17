@@ -8,16 +8,16 @@ import (
 )
 
 // Config controls the memory subsystem. Loaded from the "memory" key in
-// ~/.ollama/server.json.
+// ~/.loom/server.json.
 type Config struct {
 	// Enabled activates the memory middleware. Default false.
 	Enabled bool `json:"enabled"`
 
 	// DBPath is the LanceDB database directory.
-	// Default: ~/.ollama/memory.lance
+	// Default: ~/.loom/memory.lance
 	DBPath string `json:"db_path,omitempty"`
 
-	// EmbeddingModel is the Ollama model used for embedding generation.
+	// EmbeddingModel is the Loom model used for embedding generation.
 	// Default: "nomic-embed-text"
 	EmbeddingModel string `json:"embedding_model,omitempty"`
 
@@ -25,8 +25,27 @@ type Config struct {
 	DefaultModel string `json:"default_model,omitempty"`
 
 	// LogPath is the path to the system log file.
-	// Default: ~/.ollama/server.log
+	// Default: ~/.loom/server.log
 	LogPath string `json:"log_path,omitempty"`
+
+	// RabbitMQEnabled activates RabbitMQ dataflow event streaming.
+	RabbitMQEnabled bool `json:"rabbitmq_enabled"`
+
+	// RabbitMQURL specifies the RabbitMQ broker endpoint.
+	RabbitMQURL string `json:"rabbitmq_url,omitempty"`
+
+	// HeartbeatIntervalSeconds sets the autonomous model idle heartbeat frequency.
+	// Default: 30
+	HeartbeatIntervalSeconds int `json:"heartbeat_interval_seconds"`
+
+	// Host sets the Loom server HTTP listening address.
+	Host string `json:"host,omitempty"`
+
+	// ModelsDir sets the directory path where local model weights are stored.
+	ModelsDir string `json:"models_dir,omitempty"`
+
+	// Debug enables verbose debug logging.
+	Debug bool `json:"debug"`
 
 	// ChainEnabled activates the model chaining/pipeline feature.
 	// Default: true (when memory is enabled)
@@ -123,28 +142,37 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 // DefaultConfig returns a Config with production-ready defaults.
 func DefaultConfig() Config {
 	home, _ := os.UserHomeDir()
-	dbPath := filepath.Join(home, ".ollama", "memory.lance")
-	logPath := filepath.Join(home, ".ollama", "server.log")
+	dbPath := filepath.Join(home, ".loom", "memory.lance")
+	logPath := filepath.Join(home, ".loom", "server.log")
+
+	modelsDir := filepath.Join(home, ".loom", "models")
 
 	return Config{
-		Enabled:             false,
-		DBPath:              dbPath,
-		EmbeddingModel:      "nomic-embed-text",
-		LogPath:             logPath,
-		ChainEnabled:        true,
-		ChainMaxSteps:       10,
-		TopK:                20,
-		SimilarityThreshold: 0.65,
-		ImportanceThreshold: 0.3,
-		DecayRate:           0.01,
-		CacheSize:           10_000,
-		CacheMaxCost:        64 << 20, // 64 MiB
-		CacheTTL:            Duration{5 * time.Minute},
-		WorkerCount:         4,
-		MaxPromptMemories:   10,
-		MaxPromptTokens:     2048,
-		DecayIntervalHours:  24,
-		ArchiveAfterDays:    90,
+		Enabled:                  false,
+		DBPath:                   dbPath,
+		EmbeddingModel:           "nomic-embed-text",
+		DefaultModel:             "",
+		LogPath:                  logPath,
+		RabbitMQEnabled:          false,
+		RabbitMQURL:              "http://localhost:15672/api/exchanges/%2F/amq.default/publish",
+		HeartbeatIntervalSeconds: 30,
+		Host:                     "127.0.0.1:11434",
+		ModelsDir:                modelsDir,
+		Debug:                    false,
+		ChainEnabled:             true,
+		ChainMaxSteps:            10,
+		TopK:                     20,
+		SimilarityThreshold:      0.65,
+		ImportanceThreshold:      0.3,
+		DecayRate:                0.01,
+		CacheSize:                10_000,
+		CacheMaxCost:             64 << 20, // 64 MiB
+		CacheTTL:                 Duration{5 * time.Minute},
+		WorkerCount:              4,
+		MaxPromptMemories:        10,
+		MaxPromptTokens:          2048,
+		DecayIntervalHours:       24,
+		ArchiveAfterDays:         90,
 		Ranking: RankingWeights{
 			Similarity: 0.4,
 			Importance: 0.25,

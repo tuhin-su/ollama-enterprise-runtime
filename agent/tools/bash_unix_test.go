@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ollama/ollama/agent"
+	"github.com/loom/loom/agent"
 )
 
 func TestConfigureBashCommandSetsProcessGroup(t *testing.T) {

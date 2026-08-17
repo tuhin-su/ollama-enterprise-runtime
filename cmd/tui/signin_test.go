@@ -18,7 +18,7 @@ func TestRenderSignIn_ContainsModelName(t *testing.T) {
 }
 
 func TestRenderSignIn_ContainsURL(t *testing.T) {
-	url := "https://ollama.com/connect?key=abc123"
+	url := "https://loom.com/connect?key=abc123"
 	got := renderSignIn("test:cloud", url, 0, 120)
 	if !strings.Contains(got, url) {
 		t.Errorf("should contain URL %q", url)

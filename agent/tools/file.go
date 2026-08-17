@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ollama/ollama/agent"
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/agent"
+	"github.com/loom/loom/api"
 )
 
 const (
@@ -335,7 +335,7 @@ func writeFileAtomic(workingDir, path string, data []byte, perm os.FileMode) err
 	}
 
 	parent, name := filepath.Split(rel)
-	tmpBase := fmt.Sprintf(".%s.ollama-tmp-%d", name, os.Getpid())
+	tmpBase := fmt.Sprintf(".%s.loom-tmp-%d", name, os.Getpid())
 	for i := 0; ; i++ {
 		candidateName := tmpBase
 		if i > 0 {

@@ -1,8 +1,8 @@
 package model
 
 import (
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
-	"github.com/ollama/ollama/x/models/nn"
+	"github.com/loom/loom/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/models/nn"
 )
 
 // MakeEmbeddingLayer constructs an embedding layer from a tensor map.

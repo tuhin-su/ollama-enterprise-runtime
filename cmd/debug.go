@@ -18,7 +18,7 @@ var debugCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		logPath := filepath.Join(home, ".ollama", "debug.log")
+		logPath := filepath.Join(home, ".loom", "debug.log")
 		
 		fmt.Printf("Intercepting raw model stream from %s...\n\n", logPath)
 		

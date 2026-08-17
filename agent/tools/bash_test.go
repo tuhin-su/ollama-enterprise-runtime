@@ -9,7 +9,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/ollama/ollama/agent"
+	"github.com/loom/loom/agent"
 )
 
 func TestBashReportsFinalWorkingDir(t *testing.T) {

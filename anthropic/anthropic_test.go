@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 const (
@@ -1849,9 +1849,9 @@ func TestConvertMessage_WebSearchToolResultErrorStillCreatesToolMessage(t *testi
 	}
 }
 
-func TestConvertOllamaToAnthropicResults(t *testing.T) {
-	ollamaResp := &OllamaWebSearchResponse{
-		Results: []OllamaWebSearchResult{
+func TestConvertLoomToAnthropicResults(t *testing.T) {
+	loomResp := &LoomWebSearchResponse{
+		Results: []LoomWebSearchResult{
 			{
 				Title:   "Test Title",
 				URL:     "https://example.com",
@@ -1865,7 +1865,7 @@ func TestConvertOllamaToAnthropicResults(t *testing.T) {
 		},
 	}
 
-	results := ConvertOllamaToAnthropicResults(ollamaResp)
+	results := ConvertLoomToAnthropicResults(loomResp)
 
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(results))

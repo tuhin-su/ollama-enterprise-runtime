@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 func TestNemotron3NanoRenderer_Images(t *testing.T) {

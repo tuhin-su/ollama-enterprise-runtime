@@ -8,11 +8,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/ollama/ollama/ml"
+	"github.com/loom/loom/ml"
 )
 
 type llamaCppBinarySearch struct {
-	libOllamaPath string
+	libLoomPath string
 	executable    string
 	workingDir    string
 	goos          string
@@ -29,7 +29,7 @@ func defaultLlamaCppBinarySearch() llamaCppBinarySearch {
 
 	workingDir, _ := os.Getwd()
 	return llamaCppBinarySearch{
-		libOllamaPath: ml.LibOllamaPath,
+		libLoomPath: ml.LibLoomPath,
 		executable:    executable,
 		workingDir:    workingDir,
 		goos:          runtime.GOOS,
@@ -82,7 +82,7 @@ func llamaCppBinaryCandidates(name string, search llamaCppBinarySearch) []string
 		}
 	}
 
-	add(search.libOllamaPath)
+	add(search.libLoomPath)
 
 	addPackagedLayoutDirs := func(base string) {
 		if base == "" {
@@ -90,23 +90,23 @@ func llamaCppBinaryCandidates(name string, search llamaCppBinarySearch) []string
 		}
 		switch goos {
 		case "darwin":
-			// macOS tarballs and apps colocate llama.cpp helpers with ollama.
+			// macOS tarballs and apps colocate llama.cpp helpers with loom.
 			add(base)
-			// Per-architecture local dist output keeps helpers under lib/ollama.
-			add(filepath.Join(base, "lib", "ollama"))
-			// Standard CMake installs put ollama in bin/ and helpers in ../lib/ollama/.
-			add(filepath.Join(base, "..", "lib", "ollama"))
+			// Per-architecture local dist output keeps helpers under lib/loom.
+			add(filepath.Join(base, "lib", "loom"))
+			// Standard CMake installs put loom in bin/ and helpers in ../lib/loom/.
+			add(filepath.Join(base, "..", "lib", "loom"))
 		case "linux":
-			// Linux packages install ollama in bin/ and helpers in ../lib/ollama/.
-			add(filepath.Join(base, "..", "lib", "ollama"))
+			// Linux packages install loom in bin/ and helpers in ../lib/loom/.
+			add(filepath.Join(base, "..", "lib", "loom"))
 		case "windows":
-			// Windows packages keep ollama.exe at top level with lib/ as a peer.
-			add(filepath.Join(base, "lib", "ollama"))
-			// Standard CMake installs put ollama.exe in bin/ and helpers in ../lib/ollama/.
-			add(filepath.Join(base, "..", "lib", "ollama"))
+			// Windows packages keep loom.exe at top level with lib/ as a peer.
+			add(filepath.Join(base, "lib", "loom"))
+			// Standard CMake installs put loom.exe in bin/ and helpers in ../lib/loom/.
+			add(filepath.Join(base, "..", "lib", "loom"))
 		default:
-			add(filepath.Join(base, "lib", "ollama"))
-			add(filepath.Join(base, "..", "lib", "ollama"))
+			add(filepath.Join(base, "lib", "loom"))
+			add(filepath.Join(base, "..", "lib", "loom"))
 		}
 	}
 
@@ -114,10 +114,10 @@ func llamaCppBinaryCandidates(name string, search llamaCppBinarySearch) []string
 		if base == "" {
 			return
 		}
-		add(filepath.Join(base, "build", "lib", "ollama"))
-		add(filepath.Join(base, "dist", goos+"-"+goarch, "lib", "ollama"))
+		add(filepath.Join(base, "build", "lib", "loom"))
+		add(filepath.Join(base, "dist", goos+"-"+goarch, "lib", "loom"))
 		if goos+"_"+goarch != goos+"-"+goarch {
-			add(filepath.Join(base, "dist", goos+"_"+goarch, "lib", "ollama"))
+			add(filepath.Join(base, "dist", goos+"_"+goarch, "lib", "loom"))
 		}
 		if goos == "darwin" {
 			add(filepath.Join(base, "dist", "darwin"))

@@ -56,8 +56,8 @@ jobs:
 
           SEMVER="${VERSION#v}"
           LDFLAGS="-w -s \
-            -X github.com/ollama/ollama/version.Version=${SEMVER} \
-            -X github.com/ollama/ollama/server.mode=release"
+            -X github.com/loom/loom/version.Version=${SEMVER} \
+            -X github.com/loom/loom/server.mode=release"
 
           echo "version=${VERSION}"    >> "$GITHUB_OUTPUT"
           echo "prerelease=${PRE}"     >> "$GITHUB_OUTPUT"
@@ -133,8 +133,8 @@ jobs:
         run: |
           set -euo pipefail
           LDFLAGS="${{ needs.setup.outputs.ldflags }}"
-          BINARY="ollama"
-          [ "$GOOS" = "windows" ] && BINARY="ollama.exe"
+          BINARY="loom"
+          [ "$GOOS" = "windows" ] && BINARY="loom.exe"
 
           echo "Building ${GOOS}/${GOARCH}${GOARM:+v$GOARM} ..."
           go build -trimpath -ldflags "$LDFLAGS" -o "dist/${BINARY}" .
@@ -150,11 +150,11 @@ jobs:
           ARCH_LABEL="${GOARCH}"
           [ -n "$GOARM" ] && ARCH_LABEL="${GOARCH}v${GOARM}"
 
-          ARCHIVE_BASE="ollama-${GOOS}-${ARCH_LABEL}"
+          ARCHIVE_BASE="loom-${GOOS}-${ARCH_LABEL}"
           mkdir -p "release/${ARCHIVE_BASE}"
 
           if [ "$GOOS" = "windows" ]; then
-            cp dist/ollama.exe "release/${ARCHIVE_BASE}/"
+            cp dist/loom.exe "release/${ARCHIVE_BASE}/"
             # Copy installer scripts
             cp install.ps1 "release/${ARCHIVE_BASE}/" 2>/dev/null || true
             cd release
@@ -162,7 +162,7 @@ jobs:
             cd ..
             sha256sum "dist/${ARCHIVE_BASE}.zip" | awk '{print $1}' > "dist/${ARCHIVE_BASE}.zip.sha256"
           else
-            cp dist/ollama "release/${ARCHIVE_BASE}/"
+            cp dist/loom "release/${ARCHIVE_BASE}/"
             # Copy installer scripts and docs
             cp install.sh "release/${ARCHIVE_BASE}/" 2>/dev/null || true
             cp -r docs   "release/${ARCHIVE_BASE}/" 2>/dev/null || true
@@ -210,18 +210,18 @@ jobs:
           VERSION="${{ needs.setup.outputs.version }}"
           SEMVER="${VERSION#v}"
           cat > release-notes.md <<EOF
-          ## Ollama ${VERSION}
+          ## Loom ${VERSION}
 
           ### Installation
 
           **Linux / macOS** (auto-detects architecture):
           \`\`\`bash
-          curl -fsSL https://raw.githubusercontent.com/tuhin-su/ollama-master/main/install.sh | sh
+          curl -fsSL https://raw.githubusercontent.com/tuhin-su/loom-master/main/install.sh | sh
           \`\`\`
 
           **Windows** (PowerShell, run as Administrator):
           \`\`\`powershell
-          irm https://raw.githubusercontent.com/tuhin-su/ollama-master/main/install.ps1 | iex
+          irm https://raw.githubusercontent.com/tuhin-su/loom-master/main/install.ps1 | iex
           \`\`\`
 
           **Pin this version:**
@@ -233,24 +233,24 @@ jobs:
 
           | Platform | Architecture | Download |
           |----------|-------------|---------|
-          | Linux    | amd64       | \`ollama-linux-amd64.tar.gz\` |
-          | Linux    | arm64       | \`ollama-linux-arm64.tar.gz\` |
-          | Linux    | arm (v7)    | \`ollama-linux-armv7.tar.gz\` |
-          | Windows  | amd64       | \`ollama-windows-amd64.zip\`  |
-          | Windows  | arm64       | \`ollama-windows-arm64.zip\`  |
+          | Linux    | amd64       | \`loom-linux-amd64.tar.gz\` |
+          | Linux    | arm64       | \`loom-linux-arm64.tar.gz\` |
+          | Linux    | arm (v7)    | \`loom-linux-armv7.tar.gz\` |
+          | Windows  | amd64       | \`loom-windows-amd64.zip\`  |
+          | Windows  | arm64       | \`loom-windows-arm64.zip\`  |
 
           All assets include a \`.sha256\` checksum file.
 
           ### What's New
 
-          See [CHANGELOG](https://github.com/tuhin-su/ollama-master/blob/main/CHANGELOG.md) for full details.
+          See [CHANGELOG](https://github.com/tuhin-su/loom-master/blob/main/CHANGELOG.md) for full details.
 
           ### New Features in This Fork
 
           - 🧠 **Native long-term memory** — Remembers users, projects, and preferences across sessions  
-            See [docs/memory.md](https://github.com/tuhin-su/ollama-master/blob/main/docs/memory.md)
+            See [docs/memory.md](https://github.com/tuhin-su/loom-master/blob/main/docs/memory.md)
           - 🔑 **Token authentication** — Secure local API with Bearer token  
-            See [docs/server-config.md](https://github.com/tuhin-su/ollama-master/blob/main/docs/server-config.md)
+            See [docs/server-config.md](https://github.com/tuhin-su/loom-master/blob/main/docs/server-config.md)
           - 📦 **One-command install** — \`install.sh\` / \`install.ps1\` with auto-arch detection
           EOF
 
@@ -258,7 +258,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name:   ${{ needs.setup.outputs.version }}
-          name:       "Ollama ${{ needs.setup.outputs.version }}"
+          name:       "Loom ${{ needs.setup.outputs.version }}"
           body_file:  release-notes.md
           prerelease: ${{ needs.setup.outputs.prerelease == 'true' }}
           draft:      false
@@ -284,7 +284,7 @@ jobs:
           if [ "${{ needs.release.result }}" = "success" ]; then
             echo "## ✅ Release ${{ needs.setup.outputs.version }} published!" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "🔗 https://github.com/tuhin-su/ollama-master/releases/tag/${{ needs.setup.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "🔗 https://github.com/tuhin-su/loom-master/releases/tag/${{ needs.setup.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "## ❌ Release ${{ needs.setup.outputs.version }} FAILED" >> "$GITHUB_STEP_SUMMARY"
           fi

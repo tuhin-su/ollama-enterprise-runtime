@@ -3,9 +3,9 @@ package cache
 import (
 	"fmt"
 
-	"github.com/ollama/ollama/x/mlxrunner/batch"
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
-	"github.com/ollama/ollama/x/models/nn"
+	"github.com/loom/loom/x/mlxrunner/batch"
+	"github.com/loom/loom/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/models/nn"
 )
 
 // RecurrentCache stores state for linear-recurrent layers.

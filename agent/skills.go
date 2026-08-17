@@ -17,12 +17,12 @@ import (
 )
 
 const (
-	// SkillsDirEnv overrides the user-level Ollama-owned skills directory. The
-	// cross-client .agents/skills/ convention and project-level .ollama/skills/
-	// are also scanned (see LoadDefaultSkills); on a name collision, Ollama-owned
+	// SkillsDirEnv overrides the user-level Loom-owned skills directory. The
+	// cross-client .agents/skills/ convention and project-level .loom/skills/
+	// are also scanned (see LoadDefaultSkills); on a name collision, Loom-owned
 	// directories take precedence over .agents/skills/, and project-level takes
 	// precedence over user-level.
-	SkillsDirEnv  = "OLLAMA_SKILLS"
+	SkillsDirEnv  = "LOOM_SKILLS"
 	skillFilename = "SKILL.md"
 	maxSkillBytes = 1 << 20
 
@@ -38,7 +38,7 @@ Create a focused, reusable instruction package. Treat a skill as guidance for th
 
 ## Choose the location
 
-Create user skills beside this one. The skill directory shown in the loaded skill context is this skill's location; its parent is the user skill root. This bundled skill normally lives at ~/.ollama/skills/skill-creator, so new user skills normally go at ~/.ollama/skills/<skill-name>/SKILL.md.
+Create user skills beside this one. The skill directory shown in the loaded skill context is this skill's location; its parent is the user skill root. This bundled skill normally lives at ~/.loom/skills/skill-creator, so new user skills normally go at ~/.loom/skills/<skill-name>/SKILL.md.
 
 Use a project-local skill directory only when the user asks to keep the skill with that project. Do not overwrite an existing skill without the user's approval. New and changed skills are discovered when the agent starts, so tell the user to begin a new agent session afterward.
 
@@ -73,6 +73,33 @@ Use scripts/ for repeatable or fragile operations that benefit from deterministi
 
 Skills provide instructions only. They do not grant filesystem, network, shell, or approval privileges, and they do not make a tool available. Use only the tools that are actually available, follow their normal approval rules, and ask before actions that need user authorization.
 `
+
+	bundledSystemAssistantName    = "system-assistant"
+	bundledSystemAssistantContent = `---
+name: system-assistant
+description: System management guide for Loom. Use when the user asks how to manage models, use RAG, schedule tasks, check system health, inspect logs, or use the fallback system.
+---
+
+# Loom System Management Guide
+
+Use the native Loom tools to assist the user with enterprise runtime tasks:
+
+## 1. Multi-Model Chaining
+- Use 'chain_request' when a task requires specialized capabilities (vision, code generation, math) that the primary model lacks.
+
+## 2. RAG & Long-Term Memory
+- Use 'save_memory' to record facts, preferences, or project decisions.
+- Use 'list_memories' to recall past user profile details.
+- Use 'update_memory' or 'pin_memory' to self-modify or prioritize memories.
+
+## 3. Background Task Scheduling
+- Use 'schedule_task' to automate prompts at a specific time ('run_at') or recurring schedule ('cron').
+
+## 4. Diagnostics & System Maintenance
+- Use 'check_data_flow' to view active runner counts and memory cache stats.
+- Use 'read_system_logs' to read recent server logs.
+- Use 'get_error_logs' to inspect automatic fallback recovery history.
+`
 )
 
 var skillName = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
@@ -83,13 +110,13 @@ func SkillsDir() (string, error) {
 		return filepath.Abs(path)
 	}
 	if xdg := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); xdg != "" {
-		return filepath.Join(xdg, "ollama", "skills"), nil
+		return filepath.Join(xdg, "loom", "skills"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".ollama", "skills"), nil
+	return filepath.Join(home, ".loom", "skills"), nil
 }
 
 // Skill is a validated, loadable instruction set. It never grants tool
@@ -202,11 +229,11 @@ func DiscoverSkills(dir string) (*SkillCatalog, error) {
 // roots override earlier ones on name collisions (recording a diagnostic):
 //
 //  1. ~/.agents/skills/              (user, cross-client)
-//  2. user Ollama skills dir          (user, Ollama-owned; SkillsDir)
+//  2. user Loom skills dir          (user, Loom-owned; SkillsDir)
 //  3. <project>/.agents/skills/      (project, cross-client)
-//  4. <project>/.ollama/skills/      (project, Ollama-owned)
+//  4. <project>/.loom/skills/      (project, Loom-owned)
 //
-// Project-level overrides user-level, and within a scope Ollama-owned
+// Project-level overrides user-level, and within a scope Loom-owned
 // directories override .agents/skills/. projectDir is the agent's working
 // directory at startup (discovery is a session-start snapshot per the spec).
 func LoadDefaultSkills(projectDir string) (*SkillCatalog, error) {
@@ -222,6 +249,12 @@ func LoadDefaultSkills(projectDir string) (*SkillCatalog, error) {
 	catalog.skills[bundled.Name] = bundled
 	if err := installBundledSkillCreator(); err != nil {
 		catalog.diagnostics = append(catalog.diagnostics, err)
+	}
+
+	sysAsst, err := bundledSystemAssistant()
+	if err == nil {
+		catalog.skills[sysAsst.Name] = sysAsst
+		_ = installBundledSystemAssistant()
 	}
 	for _, root := range roots {
 		sub, err := DiscoverSkills(root.path)
@@ -270,6 +303,36 @@ func installBundledSkillCreator() error {
 	return nil
 }
 
+func bundledSystemAssistant() (Skill, error) {
+	skill, err := parseSkillContent("", bundledSystemAssistantName, bundledSystemAssistantContent)
+	if err != nil {
+		return Skill{}, fmt.Errorf("load bundled %s skill: %w", bundledSystemAssistantName, err)
+	}
+	return skill, nil
+}
+
+func installBundledSystemAssistant() error {
+	dir, err := SkillsDir()
+	if err != nil {
+		return fmt.Errorf("resolve bundled skill directory: %w", err)
+	}
+	path := filepath.Join(dir, bundledSystemAssistantName, skillFilename)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create bundled skill directory: %w", err)
+	}
+	contents, err := os.ReadFile(path)
+	if err == nil && string(contents) == bundledSystemAssistantContent {
+		return nil
+	}
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("read bundled skill: %w", err)
+	}
+	if err := os.WriteFile(path, []byte(bundledSystemAssistantContent), 0o644); err != nil {
+		return fmt.Errorf("write bundled skill: %w", err)
+	}
+	return nil
+}
+
 type skillRoot struct {
 	path string
 }
@@ -293,7 +356,7 @@ type SkillImportFailure struct {
 }
 
 // ImportSkills imports skills from a conventional coding-agent source into the
-// canonical Ollama skills directory. Supported sources are codex, claude, and
+// canonical Loom skills directory. Supported sources are codex, claude, and
 // pi. Existing skills are left untouched: an identical directory is reported
 // as existing, and a differing one is reported as a conflict.
 func ImportSkills(source string) (SkillImportResult, error) {
@@ -304,7 +367,7 @@ func ImportSkills(source string) (SkillImportResult, error) {
 
 	destination, err := SkillsDir()
 	if err != nil {
-		return SkillImportResult{}, fmt.Errorf("resolve Ollama skills directory: %w", err)
+		return SkillImportResult{}, fmt.Errorf("resolve Loom skills directory: %w", err)
 	}
 	return importSkillsFromRoots(source, conventionalSkillImportRoots(home), destination)
 }
@@ -479,14 +542,14 @@ func importSkillDirectory(source, destination string) (skillImportState, error) 
 
 func ensureImportDestination(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create Ollama skills directory: %w", err)
+		return fmt.Errorf("create Loom skills directory: %w", err)
 	}
 	info, err := os.Lstat(dir)
 	if err != nil {
-		return fmt.Errorf("inspect Ollama skills directory: %w", err)
+		return fmt.Errorf("inspect Loom skills directory: %w", err)
 	}
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return errors.New("Ollama skills directory must be a regular, non-symlinked directory")
+		return errors.New("Loom skills directory must be a regular, non-symlinked directory")
 	}
 	return nil
 }
@@ -632,18 +695,18 @@ func defaultSkillRoots(projectDir string) ([]skillRoot, error) {
 		roots = append(roots, skillRoot{path: filepath.Join(home, ".agents", "skills")})
 	}
 
-	userOllama, err := SkillsDir()
+	userLoom, err := SkillsDir()
 	if err != nil {
 		return nil, err
 	}
-	roots = append(roots, skillRoot{path: userOllama})
+	roots = append(roots, skillRoot{path: userLoom})
 
 	projectDir = strings.TrimSpace(projectDir)
 	if projectDir != "" {
 		if abs, err := filepath.Abs(projectDir); err == nil {
 			roots = append(roots,
 				skillRoot{path: filepath.Join(abs, ".agents", "skills")},
-				skillRoot{path: filepath.Join(abs, ".ollama", "skills")},
+				skillRoot{path: filepath.Join(abs, ".loom", "skills")},
 			)
 		}
 	}
@@ -941,7 +1004,7 @@ func ImportSkillsFromSource(source string) ([]SkillImportResult, error) {
 
 	destination, err := SkillsDir()
 	if err != nil {
-		return nil, fmt.Errorf("resolve Ollama skills directory: %w", err)
+		return nil, fmt.Errorf("resolve Loom skills directory: %w", err)
 	}
 
 	roots := conventionalSkillImportRoots(home)

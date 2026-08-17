@@ -3,7 +3,7 @@ package glm4_moe_lite
 import (
 	"testing"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 func TestParserThinking(t *testing.T) {

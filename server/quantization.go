@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"strings"
 
-	fsggml "github.com/ollama/ollama/fs/ggml"
-	"github.com/ollama/ollama/llm"
-	"github.com/ollama/ollama/manifest"
+	fsggml "github.com/loom/loom/fs/ggml"
+	"github.com/loom/loom/llm"
+	"github.com/loom/loom/manifest"
 )
 
 // findLlamaQuantize locates the llama-quantize binary (installed alongside llama-server).
@@ -26,7 +26,7 @@ func findLlamaQuantize() (string, error) {
 // progressRegex matches llama-quantize output lines like "[ 42/ 200]"
 var progressRegex = regexp.MustCompile(`\[\s*(\d+)/\s*(\d+)\]`)
 
-const llamaCppCompatEnv = "OLLAMA_LLAMA_CPP_COMPAT"
+const llamaCppCompatEnv = "LOOM_LLAMA_CPP_COMPAT"
 
 var runLlamaQuantize = runLlamaQuantizeCommand
 
@@ -320,7 +320,7 @@ func llamaQuantizeArgs(arch string, newFileType fsggml.FileType, input, output, 
 	}
 	// GLM-OCR is a small multimodal OCR model; keeping the input/output
 	// embeddings high precision avoids degenerate text output on K-quants.
-	// Legacy Ollama GGUFs use "glmocr"; split text GGUFs use llama.cpp's
+	// Legacy Loom GGUFs use "glmocr"; split text GGUFs use llama.cpp's
 	// native "glm4" architecture.
 	if arch == "glmocr" || arch == "glm4" {
 		switch newFileType {

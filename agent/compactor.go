@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 // Compaction wire-format. These constants and helpers are the single canonical
@@ -16,7 +16,7 @@ import (
 const (
 	CompactionSummaryMessagePrefix = "Conversation summary:\n"
 	CompactionToolName             = "summary"
-	CompactionToolCallID           = "ollama_compaction"
+	CompactionToolCallID           = "loom_compaction"
 	CompactionContinueInstruction  = "continue the task in progress. the history has been compacted, do not mention compaction to the user"
 )
 
@@ -28,7 +28,7 @@ const (
 
 	maxCompactionSummaryRunes = 16 * 1024
 
-	compactionSystemPrompt = "Summarize the archived part of an Ollama agent conversation. Preserve user goals, decisions, files, commands, tool results, and unresolved tasks needed to continue. Omit private reasoning and return only the summary."
+	compactionSystemPrompt = "Summarize the archived part of an Loom agent conversation. Preserve user goals, decisions, files, commands, tool results, and unresolved tasks needed to continue. Omit private reasoning and return only the summary."
 )
 
 type Compactor interface {

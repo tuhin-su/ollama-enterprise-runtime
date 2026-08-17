@@ -20,111 +20,111 @@ func TestLlamaCppBinaryCandidates(t *testing.T) {
 		{
 			name: "linux production layout",
 			search: llamaCppBinarySearch{
-				executable: filepath.Join(root, "linux", "bin", "ollama"),
+				executable: filepath.Join(root, "linux", "bin", "loom"),
 				goos:       "linux",
 				goarch:     "amd64",
 			},
-			want:      []string{filepath.Join(root, "linux", "lib", "ollama", "llama-server")},
-			wantFirst: filepath.Join(root, "linux", "lib", "ollama", "llama-server"),
+			want:      []string{filepath.Join(root, "linux", "lib", "loom", "llama-server")},
+			wantFirst: filepath.Join(root, "linux", "lib", "loom", "llama-server"),
 		},
 		{
 			name: "windows production layout",
 			search: llamaCppBinarySearch{
-				executable: filepath.Join(root, "windows", "ollama.exe"),
+				executable: filepath.Join(root, "windows", "loom.exe"),
 				goos:       "windows",
 				goarch:     "amd64",
 			},
-			want:      []string{filepath.Join(root, "windows", "lib", "ollama", "llama-server.exe")},
-			wantFirst: filepath.Join(root, "windows", "lib", "ollama", "llama-server.exe"),
+			want:      []string{filepath.Join(root, "windows", "lib", "loom", "llama-server.exe")},
+			wantFirst: filepath.Join(root, "windows", "lib", "loom", "llama-server.exe"),
 		},
 		{
 			name: "darwin production layout",
 			search: llamaCppBinarySearch{
-				executable: filepath.Join(root, "Ollama.app", "Contents", "Resources", "ollama"),
+				executable: filepath.Join(root, "Loom.app", "Contents", "Resources", "loom"),
 				goos:       "darwin",
 				goarch:     "arm64",
 			},
-			want:      []string{filepath.Join(root, "Ollama.app", "Contents", "Resources", "llama-server")},
-			wantFirst: filepath.Join(root, "Ollama.app", "Contents", "Resources", "llama-server"),
+			want:      []string{filepath.Join(root, "Loom.app", "Contents", "Resources", "llama-server")},
+			wantFirst: filepath.Join(root, "Loom.app", "Contents", "Resources", "llama-server"),
 		},
 		{
 			name: "darwin standard install layout",
 			search: llamaCppBinarySearch{
-				executable: filepath.Join(root, "darwin", "bin", "ollama"),
+				executable: filepath.Join(root, "darwin", "bin", "loom"),
 				goos:       "darwin",
 				goarch:     "arm64",
 			},
-			want: []string{filepath.Join(root, "darwin", "lib", "ollama", "llama-server")},
+			want: []string{filepath.Join(root, "darwin", "lib", "loom", "llama-server")},
 		},
 		{
 			name: "windows standard install layout",
 			search: llamaCppBinarySearch{
-				executable: filepath.Join(root, "windows", "bin", "ollama.exe"),
+				executable: filepath.Join(root, "windows", "bin", "loom.exe"),
 				goos:       "windows",
 				goarch:     "amd64",
 			},
-			want: []string{filepath.Join(root, "windows", "lib", "ollama", "llama-server.exe")},
+			want: []string{filepath.Join(root, "windows", "lib", "loom", "llama-server.exe")},
 		},
 		{
 			name: "local per-architecture dist layout",
 			search: llamaCppBinarySearch{
-				executable: filepath.Join(root, "dist", "darwin-arm64", "ollama"),
+				executable: filepath.Join(root, "dist", "darwin-arm64", "loom"),
 				goos:       "darwin",
 				goarch:     "arm64",
 			},
-			want: []string{filepath.Join(root, "dist", "darwin-arm64", "lib", "ollama", "llama-server")},
+			want: []string{filepath.Join(root, "dist", "darwin-arm64", "lib", "loom", "llama-server")},
 		},
 		{
 			name: "local top-level executable on linux",
 			search: llamaCppBinarySearch{
-				executable: filepath.Join(root, "ollama"),
+				executable: filepath.Join(root, "loom"),
 				workingDir: root,
 				goos:       "linux",
 				goarch:     "amd64",
 			},
 			want: []string{
-				filepath.Join(root, "build", "lib", "ollama", "llama-server"),
-				filepath.Join(root, "dist", "linux-amd64", "lib", "ollama", "llama-server"),
-				filepath.Join(root, "dist", "linux_amd64", "lib", "ollama", "llama-server"),
+				filepath.Join(root, "build", "lib", "loom", "llama-server"),
+				filepath.Join(root, "dist", "linux-amd64", "lib", "loom", "llama-server"),
+				filepath.Join(root, "dist", "linux_amd64", "lib", "loom", "llama-server"),
 			},
 		},
 		{
 			name: "local top-level executable on windows",
 			search: llamaCppBinarySearch{
-				executable: filepath.Join(root, "ollama.exe"),
+				executable: filepath.Join(root, "loom.exe"),
 				workingDir: root,
 				goos:       "windows",
 				goarch:     "amd64",
 			},
 			want: []string{
-				filepath.Join(root, "build", "lib", "ollama", "llama-server.exe"),
-				filepath.Join(root, "dist", "windows-amd64", "lib", "ollama", "llama-server.exe"),
+				filepath.Join(root, "build", "lib", "loom", "llama-server.exe"),
+				filepath.Join(root, "dist", "windows-amd64", "lib", "loom", "llama-server.exe"),
 			},
 		},
 		{
 			name: "local top-level executable on darwin",
 			search: llamaCppBinarySearch{
-				executable: filepath.Join(root, "ollama"),
+				executable: filepath.Join(root, "loom"),
 				workingDir: root,
 				goos:       "darwin",
 				goarch:     "arm64",
 			},
 			want: []string{
-				filepath.Join(root, "build", "lib", "ollama", "llama-server"),
-				filepath.Join(root, "dist", "darwin-arm64", "lib", "ollama", "llama-server"),
+				filepath.Join(root, "build", "lib", "loom", "llama-server"),
+				filepath.Join(root, "dist", "darwin-arm64", "lib", "loom", "llama-server"),
 				filepath.Join(root, "dist", "darwin", "llama-server"),
 			},
 		},
 		{
 			name: "explicit lib path stays first",
 			search: llamaCppBinarySearch{
-				libOllamaPath: filepath.Join(root, "install", "lib", "ollama"),
-				executable:    filepath.Join(root, "app", "ollama"),
+				libLoomPath: filepath.Join(root, "install", "lib", "loom"),
+				executable:    filepath.Join(root, "app", "loom"),
 				workingDir:    filepath.Join(root, "work"),
 				goos:          "linux",
 				goarch:        "amd64",
 			},
-			want: []string{filepath.Join(root, "install", "lib", "ollama", "llama-server")},
+			want: []string{filepath.Join(root, "install", "lib", "loom", "llama-server")},
 		},
 	}
 
@@ -134,7 +134,7 @@ func TestLlamaCppBinaryCandidates(t *testing.T) {
 			if tt.wantFirst != "" && candidates[0] != tt.wantFirst {
 				t.Fatalf("first candidate = %q, want %q; all candidates: %v", candidates[0], tt.wantFirst, candidates)
 			}
-			if tt.search.libOllamaPath != "" && candidates[0] != tt.want[0] {
+			if tt.search.libLoomPath != "" && candidates[0] != tt.want[0] {
 				t.Fatalf("first candidate = %q, want %q; all candidates: %v", candidates[0], tt.want[0], candidates)
 			}
 			for _, want := range tt.want {

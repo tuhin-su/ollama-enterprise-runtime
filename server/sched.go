@@ -14,17 +14,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/discover"
-	"github.com/ollama/ollama/envconfig"
-	"github.com/ollama/ollama/format"
-	"github.com/ollama/ollama/fs/ggml"
-	"github.com/ollama/ollama/llm"
-	"github.com/ollama/ollama/logutil"
-	"github.com/ollama/ollama/ml"
-	"github.com/ollama/ollama/types/model"
-	"github.com/ollama/ollama/x/imagegen"
-	"github.com/ollama/ollama/x/mlxrunner"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/discover"
+	"github.com/loom/loom/envconfig"
+	"github.com/loom/loom/format"
+	"github.com/loom/loom/fs/ggml"
+	"github.com/loom/loom/llm"
+	"github.com/loom/loom/logutil"
+	"github.com/loom/loom/ml"
+	"github.com/loom/loom/types/model"
+	"github.com/loom/loom/x/imagegen"
+	"github.com/loom/loom/x/mlxrunner"
 )
 
 type LlmRequest struct {
@@ -40,11 +40,11 @@ type LlmRequest struct {
 	// evict-all-and-retry. Prevents infinite retry on persistent load failures.
 	oomRetryAttempted bool
 
-	// numCtxAuto is true when NumCtx came from Ollama's automatic VRAM-tier
+	// numCtxAuto is true when NumCtx came from Loom's automatic VRAM-tier
 	// default rather than explicit request, model, or environment config.
 	numCtxAuto bool
 
-	// numBatchAuto is true when NumBatch came from Ollama's default options
+	// numBatchAuto is true when NumBatch came from Loom's default options
 	// rather than an explicit request or model option.
 	numBatchAuto bool
 
@@ -288,7 +288,7 @@ func (s *Scheduler) processPending(ctx context.Context) {
 						} else {
 							maxRunners = uint(defaultModelsPerGPU * max(len(gpus), 1))
 						}
-						slog.Debug("updating default concurrency", "OLLAMA_MAX_LOADED_MODELS", maxRunners, "gpu_count", len(gpus))
+						slog.Debug("updating default concurrency", "LOOM_MAX_LOADED_MODELS", maxRunners, "gpu_count", len(gpus))
 					}
 
 					// Update free memory from currently loaded models
@@ -504,7 +504,7 @@ func (s *Scheduler) load(req *LlmRequest, systemInfo ml.SystemInfo, gpus []ml.De
 	}
 
 	// Some architectures are not safe with num_parallel > 1.
-	// ref: https://github.com/ollama/ollama/issues/4165
+	// ref: https://github.com/loom/loom/issues/4165
 	if slices.Contains([]string{"mllama", "qwen3vl", "qwen3vlmoe", "qwen35", "qwen35moe", "qwen3next", "lfm2", "lfm2moe", "nemotron_h", "nemotron_h_moe", "nemotron_h_omni"}, req.model.Config.ModelFamily) && numParallel != 1 {
 		numParallel = 1
 		slog.Warn("model architecture does not currently support parallel requests", "architecture", req.model.Config.ModelFamily)
@@ -581,7 +581,7 @@ func (s *Scheduler) load(req *LlmRequest, systemInfo ml.SystemInfo, gpus []ml.De
 				// show a generalized compatibility error until there is a better way to
 				// check for model compatibility
 				if errors.Is(err, ggml.ErrUnsupportedFormat) || strings.Contains(err.Error(), "failed to load model") {
-					err = fmt.Errorf("%v: this model may be incompatible with your version of Ollama. If you previously pulled this model, try updating it by running `ollama pull %s`", err, req.model.ShortName)
+					err = fmt.Errorf("%v: this model may be incompatible with your version of Loom. If you previously pulled this model, try updating it by running `loom pull %s`", err, req.model.ShortName)
 				}
 			}
 		} else {
@@ -944,7 +944,7 @@ func availableMemoryForLoad(systemInfo ml.SystemInfo, gpus []ml.DeviceInfo) (ava
 	}
 
 	// On iGPUs, GPU free memory can be a static or slowly refreshed device
-	// baseline. updateFreeSpace has already subtracted known Ollama runner
+	// baseline. updateFreeSpace has already subtracted known Loom runner
 	// allocations from that baseline. Current system free memory is a separate
 	// live measurement that already includes those loaded runners, so use the
 	// smaller value for shared-memory GPUs without discounting discrete VRAM.

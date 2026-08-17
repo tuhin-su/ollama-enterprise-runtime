@@ -43,27 +43,27 @@ func newBashCommand(ctx context.Context, command, cwdPath string) *exec.Cmd {
 func powerShellCommandScript(command, cwdPath string) string {
 	cwdPath = powerShellSingleQuote(cwdPath)
 	return strings.Join([]string{
-		"$__ollama_status = 0",
+		"$__loom_status = 0",
 		". {",
 		"try {",
 		command,
-		"  $__ollama_success = $?",
-		"  $__ollama_last_exit = $global:LASTEXITCODE",
-		"  if ($__ollama_success) {",
-		"    $__ollama_status = 0",
-		"  } elseif ($__ollama_last_exit -is [int] -and $__ollama_last_exit -ne 0) {",
-		"    $__ollama_status = $__ollama_last_exit",
+		"  $__loom_success = $?",
+		"  $__loom_last_exit = $global:LASTEXITCODE",
+		"  if ($__loom_success) {",
+		"    $__loom_status = 0",
+		"  } elseif ($__loom_last_exit -is [int] -and $__loom_last_exit -ne 0) {",
+		"    $__loom_status = $__loom_last_exit",
 		"  } else {",
-		"    $__ollama_status = 1",
+		"    $__loom_status = 1",
 		"  }",
 		"} catch {",
 		"  Write-Error $_",
-		"  $__ollama_status = 1",
+		"  $__loom_status = 1",
 		"} finally {",
 		"  try { [System.IO.File]::WriteAllText(" + cwdPath + ", (Get-Location).ProviderPath, [System.Text.Encoding]::UTF8) } catch {}",
 		"}",
 		"} | Out-String -Stream -Width 4096",
-		"exit $__ollama_status",
+		"exit $__loom_status",
 	}, "\n")
 }
 

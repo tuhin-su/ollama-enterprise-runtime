@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ollama/ollama/agent"
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/agent"
+	"github.com/loom/loom/api"
 )
 
 func TestSkillLoadsCoreCatalogWithApproval(t *testing.T) {

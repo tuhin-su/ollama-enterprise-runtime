@@ -19,8 +19,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	fsc "github.com/ollama/ollama/fs"
-	"github.com/ollama/ollama/fs/ggml"
+	fsc "github.com/loom/loom/fs"
+	"github.com/loom/loom/fs/ggml"
 )
 
 type tensorData struct {
@@ -285,7 +285,7 @@ func TestConvertAdapter(t *testing.T) {
 
 	cases := []AdapterCase{
 		{
-			Name: "discollama",
+			Name: "discloom",
 			BaseKV: map[string]any{
 				"general.architecture":          "llama",
 				"llama.attention.head_count":    uint32(32),
@@ -432,7 +432,7 @@ func generateLoraTestData(t *testing.T, tempDir string) {
     "adapter_path": "adapters-test",
     "batch_size": 8,
     "config": "config-tiny.json",
-    "data": "../discollama-completion",
+    "data": "../discloom-completion",
     "grad_checkpoint": null,
     "iters": 1000,
     "learning_rate": 1e-05,

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/mlxrunner/mlx"
 )
 
 var (
@@ -20,8 +20,8 @@ var (
 // started (and MLX initialized) on first use. A panic in f is recovered and
 // returned as an error so a kernel failure cannot kill the pinned thread.
 //
-// TODO(pdevine): This method should be revisited when the `ollama create` is
-// instead run on the ollama server process instead of the client.
+// TODO(pdevine): This method should be revisited when the `loom create` is
+// instead run on the loom server process instead of the client.
 func runOnMLXThread(f func() error) error {
 	mlxThreadOnce.Do(func() {
 		mlxWork = make(chan func())

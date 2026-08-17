@@ -1,6 +1,6 @@
 package server
 
-// task_scheduler.go — Scheduled task engine for Ollama.
+// task_scheduler.go — Scheduled task engine for Loom.
 //
 // Allows models (and users) to schedule prompts to run against any local model
 // at a specific time, after a delay, or on a recurring cron schedule.
@@ -24,9 +24,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/llm"
-	"github.com/ollama/ollama/types/model"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/llm"
+	"github.com/loom/loom/types/model"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ type ScheduledJob struct {
 	PromptID string `json:"prompt_id"`
 	// Prompt is the user message sent to the model.
 	Prompt string `json:"prompt"`
-	// Model is the Ollama model to use. Empty = server default model.
+	// Model is the Loom model to use. Empty = server default model.
 	Model string `json:"model,omitempty"`
 	// SystemPrompt is an optional system message.
 	SystemPrompt string `json:"system_prompt,omitempty"`
@@ -107,7 +107,7 @@ func initTaskScheduler(ctx context.Context, s *Server) {
 	}
 	ts := &TaskScheduler{
 		jobs:     make(map[string]*ScheduledJob),
-		filePath: filepath.Join(home, ".ollama", "scheduler.json"),
+		filePath: filepath.Join(home, ".loom", "scheduler.json"),
 		server:   s,
 	}
 	ts.load()
@@ -615,7 +615,7 @@ func schedulerDefaultModel() string {
 	if err != nil {
 		return ""
 	}
-	data, err := os.ReadFile(filepath.Join(home, ".ollama", "server.json"))
+	data, err := os.ReadFile(filepath.Join(home, ".loom", "server.json"))
 	if err != nil {
 		return ""
 	}

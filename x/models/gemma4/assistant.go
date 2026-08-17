@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ollama/ollama/x/mlxrunner/batch"
-	"github.com/ollama/ollama/x/mlxrunner/cache"
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
-	"github.com/ollama/ollama/x/mlxrunner/model"
-	"github.com/ollama/ollama/x/mlxrunner/model/base"
-	"github.com/ollama/ollama/x/models/nn"
+	"github.com/loom/loom/x/mlxrunner/batch"
+	"github.com/loom/loom/x/mlxrunner/cache"
+	"github.com/loom/loom/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/mlxrunner/model"
+	"github.com/loom/loom/x/mlxrunner/model/base"
+	"github.com/loom/loom/x/models/nn"
 )
 
 var _ base.DraftModel = (*AssistantModel)(nil)

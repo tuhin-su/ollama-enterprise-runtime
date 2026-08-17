@@ -6,17 +6,17 @@ import (
 	"runtime"
 )
 
-type libOllamaPathSearch struct {
+type libLoomPathSearch struct {
 	executable string
 	workingDir string
 	goos       string
 	goarch     string
 }
 
-// LibOllamaPath is the root used to find bundled llama.cpp and MLX runtime
+// LibLoomPath is the root used to find bundled llama.cpp and MLX runtime
 // libraries. GPU-specific libraries live in backend subdirectories such as
 // cuda_v12, rocm_v7_2, vulkan, and mlx_cuda_v13.
-var LibOllamaPath = func() string {
+var LibLoomPath = func() string {
 	exe, err := os.Executable()
 	if err != nil {
 		return ""
@@ -30,7 +30,7 @@ var LibOllamaPath = func() string {
 		cwd = ""
 	}
 
-	return findLibOllamaPath(libOllamaPathSearch{
+	return findLibLoomPath(libLoomPathSearch{
 		executable: exe,
 		workingDir: cwd,
 		goos:       runtime.GOOS,
@@ -38,10 +38,10 @@ var LibOllamaPath = func() string {
 	})
 }()
 
-func findLibOllamaPath(search libOllamaPathSearch) string {
-	candidates := libOllamaPathCandidates(search)
+func findLibLoomPath(search libLoomPathSearch) string {
+	candidates := libLoomPathCandidates(search)
 	for _, path := range candidates {
-		if libOllamaPathExists(path) {
+		if libLoomPathExists(path) {
 			return path
 		}
 	}
@@ -52,7 +52,7 @@ func findLibOllamaPath(search libOllamaPathSearch) string {
 	return ""
 }
 
-func libOllamaPathCandidates(search libOllamaPathSearch) []string {
+func libLoomPathCandidates(search libLoomPathSearch) []string {
 	goos := search.goos
 	if goos == "" {
 		goos = runtime.GOOS
@@ -79,45 +79,45 @@ func libOllamaPathCandidates(search libOllamaPathSearch) []string {
 		exeDir := filepath.Dir(search.executable)
 		switch goos {
 		case "darwin":
-			// Local dist output and standard installs keep helpers under lib/ollama.
-			add(filepath.Join(exeDir, "lib", "ollama"))
-			add(filepath.Join(exeDir, "..", "lib", "ollama"))
+			// Local dist output and standard installs keep helpers under lib/loom.
+			add(filepath.Join(exeDir, "lib", "loom"))
+			add(filepath.Join(exeDir, "..", "lib", "loom"))
 		case "linux":
-			add(filepath.Join(exeDir, "..", "lib", "ollama"))
-			add(filepath.Join(exeDir, "lib", "ollama"))
+			add(filepath.Join(exeDir, "..", "lib", "loom"))
+			add(filepath.Join(exeDir, "lib", "loom"))
 		case "windows":
-			add(filepath.Join(exeDir, "lib", "ollama"))
-			add(filepath.Join(exeDir, "..", "lib", "ollama"))
+			add(filepath.Join(exeDir, "lib", "loom"))
+			add(filepath.Join(exeDir, "..", "lib", "loom"))
 		default:
-			add(filepath.Join(exeDir, "lib", "ollama"))
-			add(filepath.Join(exeDir, "..", "lib", "ollama"))
+			add(filepath.Join(exeDir, "lib", "loom"))
+			add(filepath.Join(exeDir, "..", "lib", "loom"))
 		}
-		addLocalLibOllamaPaths(add, exeDir, goos, goarch)
+		addLocalLibLoomPaths(add, exeDir, goos, goarch)
 		if goos == "darwin" {
-			// macOS release artifacts colocate native helpers with ollama.
+			// macOS release artifacts colocate native helpers with loom.
 			add(exeDir)
 		}
 	}
-	addLocalLibOllamaPaths(add, search.workingDir, goos, goarch)
+	addLocalLibLoomPaths(add, search.workingDir, goos, goarch)
 
 	return candidates
 }
 
-func addLocalLibOllamaPaths(add func(string), base, goos, goarch string) {
+func addLocalLibLoomPaths(add func(string), base, goos, goarch string) {
 	if base == "" {
 		return
 	}
-	add(filepath.Join(base, "build", "lib", "ollama"))
-	add(filepath.Join(base, "dist", goos+"-"+goarch, "lib", "ollama"))
+	add(filepath.Join(base, "build", "lib", "loom"))
+	add(filepath.Join(base, "dist", goos+"-"+goarch, "lib", "loom"))
 	if goos+"_"+goarch != goos+"-"+goarch {
-		add(filepath.Join(base, "dist", goos+"_"+goarch, "lib", "ollama"))
+		add(filepath.Join(base, "dist", goos+"_"+goarch, "lib", "loom"))
 	}
 	if goos == "darwin" {
 		add(filepath.Join(base, "dist", "darwin"))
 	}
 }
 
-func libOllamaPathExists(path string) bool {
+func libLoomPathExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
 }

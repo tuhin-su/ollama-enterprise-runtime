@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/ollama/ollama/logutil"
+	"github.com/loom/loom/logutil"
 )
 
 type Array struct {

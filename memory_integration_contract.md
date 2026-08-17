@@ -1,6 +1,6 @@
-# Ollama Long-Term Memory System: Integration & Communication Contract
+# Loom Long-Term Memory System: Integration & Communication Contract
 
-This document specifies the contract and communication protocol for external tools, API clients, and scripts (such as [chat.py](file:///home/master/Desktop/ollama-master/chat.py) and [test.py](file:///home/master/Desktop/ollama-master/test.py)) integrating with Ollama's native long-term memory subsystem.
+This document specifies the contract and communication protocol for external tools, API clients, and scripts (such as [chat.py](file:///home/master/Desktop/loom-master/chat.py) and [test.py](file:///home/master/Desktop/loom-master/test.py)) integrating with Loom's native long-term memory subsystem.
 
 ---
 
@@ -12,7 +12,7 @@ The memory subsystem intercepts standard `/api/chat` requests and responses via 
 graph TD
     User([External Client]) -->|1. /api/chat Request| Middleware[Memory Middleware]
     
-    subgraph Ollama Server
+    subgraph Loom Server
         Middleware -->|2. Extract query| Search[KNN Search]
         Search -->|3. Lookup vectors| LanceDB[(LanceDB Storage)]
         Search -->|4. Rank candidates| Ranker[Decay & Importance Ranker]
@@ -32,12 +32,12 @@ graph TD
 
 ## 2. API Communication Protocol
 
-External clients interact with the memory-enriched server using standard Ollama API requests. No special headers are required to activate memory, provided it is enabled in the configuration.
+External clients interact with the memory-enriched server using standard Loom API requests. No special headers are required to activate memory, provided it is enabled in the configuration.
 
 ### A. Identification and Multi-User Setup
 By default, the memory engine keys memories by the **client's remote IP address**.
 To support multi-user environments:
-- Enable Token Authentication in `~/.ollama/server.json`.
+- Enable Token Authentication in `~/.loom/server.json`.
 - Send the `Authorization: Bearer <token>` header in all HTTP requests.
 
 ### B. Standard Chat Payload (`/api/chat`)
@@ -78,7 +78,7 @@ If the model template has `CapabilityTools` enabled, the server automatically ap
 ## 3. Storage and Data Representation
 
 Memory is persisted in a local directory formatted as a columnar LanceDB store:
-- **Default Database Path:** `~/.ollama/memory.lance` (configurable via `memory.db_path` in `server.json`).
+- **Default Database Path:** `~/.loom/memory.lance` (configurable via `memory.db_path` in `server.json`).
 - **Embedding Dimensions:** Determined by the configured model (e.g., `768` dimensions for `nomic-embed-text`).
 
 ### Memory Document Schema (JSON representation):
@@ -103,16 +103,16 @@ Memory is persisted in a local directory formatted as a columnar LanceDB store:
 
 ---
 
-## 4. Server Configuration (`~/.ollama/server.json`)
+## 4. Server Configuration (`~/.loom/server.json`)
 
-To configure the memory subsystem, edit or create `~/.ollama/server.json` on the host machine:
+To configure the memory subsystem, edit or create `~/.loom/server.json` on the host machine:
 
 ```json
 {
-  "api_token": "ollama-secret-token-123",
+  "api_token": "loom-secret-token-123",
   "memory": {
     "enabled": true,
-    "db_path": "/home/master/.ollama/memory.lance",
+    "db_path": "/home/master/.loom/memory.lance",
     "embedding_model": "nomic-embed-text",
     "top_k": 20,
     "similarity_threshold": 0.65,

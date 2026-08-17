@@ -3,7 +3,7 @@ package renderers
 import (
 	"testing"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 // Ground truth in these tests comes from rendering North-Mini-Code-1.0's

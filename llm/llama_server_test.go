@@ -22,10 +22,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ollama/ollama/fs/ggml"
-	"github.com/ollama/ollama/ml"
+	"github.com/loom/loom/fs/ggml"
+	"github.com/loom/loom/ml"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -855,7 +855,7 @@ func TestLlamaServerCompletionWithMediaUsesRunnerMarker(t *testing.T) {
 	var portInt int
 	fmt.Sscanf(parts[len(parts)-1], "%d", &portInt)
 
-	const mediaMarker = "<__ollama_media_test__>"
+	const mediaMarker = "<__loom_media_test__>"
 	runner := &llamaServerRunner{
 		port:        portInt,
 		cmd:         fakeRunningCmd(),
@@ -1073,7 +1073,7 @@ func TestLlamaServerWaitUntilRunningWaitsOnRecoverableStartupOOM(t *testing.T) {
 }
 
 func TestLlamaServerWaitUntilRunningTimesOutWhenLoadStalls(t *testing.T) {
-	t.Setenv("OLLAMA_LOAD_TIMEOUT", "10ms")
+	t.Setenv("LOOM_LOAD_TIMEOUT", "10ms")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/health" {
@@ -1104,7 +1104,7 @@ func TestLlamaServerWaitUntilRunningTimesOutWhenLoadStalls(t *testing.T) {
 }
 
 func TestLlamaServerWaitUntilRunningExtendsTimeoutOnOutputActivity(t *testing.T) {
-	t.Setenv("OLLAMA_LOAD_TIMEOUT", "100ms")
+	t.Setenv("LOOM_LOAD_TIMEOUT", "100ms")
 
 	var activityCount atomic.Int32
 	var activityStarted atomic.Bool
@@ -1331,7 +1331,7 @@ func TestSetupLlamaServerCommandEnv(t *testing.T) {
 	t.Setenv(pathEnv, userLibDir)
 
 	cmd := exec.Command("echo")
-	SetupLlamaServerCommandEnv(cmd, exe, []string{ml.LibOllamaPath, gpuDir}, map[string]string{"OLLAMA_DEBUG": "1"})
+	SetupLlamaServerCommandEnv(cmd, exe, []string{ml.LibLoomPath, gpuDir}, map[string]string{"LOOM_DEBUG": "1"})
 
 	env := make(map[string]string)
 	for _, kv := range cmd.Env {
@@ -1344,8 +1344,8 @@ func TestSetupLlamaServerCommandEnv(t *testing.T) {
 	if got := env["GGML_BACKEND_PATH"]; got != backendPath {
 		t.Fatalf("GGML_BACKEND_PATH = %q, want %q", got, backendPath)
 	}
-	if got := env["OLLAMA_DEBUG"]; got != "1" {
-		t.Fatalf("OLLAMA_DEBUG = %q, want %q", got, "1")
+	if got := env["LOOM_DEBUG"]; got != "1" {
+		t.Fatalf("LOOM_DEBUG = %q, want %q", got, "1")
 	}
 
 	paths := filepath.SplitList(env[strings.ToUpper(pathEnv)])
@@ -1365,8 +1365,8 @@ func TestSetupLlamaServerCommandEnv(t *testing.T) {
 
 func TestFilteredEnvLogValue(t *testing.T) {
 	attrs := filteredEnv([]string{
-		"OLLAMA_DEBUG=1",
-		"OLLAMA_API_KEY=ollama-secret",
+		"LOOM_DEBUG=1",
+		"LOOM_API_KEY=loom-secret",
 		"OPENAI_API_KEY=openai-secret",
 		"HF_TOKEN=hf-secret",
 		"GGML_BACKEND_PATH=/tmp/ggml",
@@ -1381,7 +1381,7 @@ func TestFilteredEnvLogValue(t *testing.T) {
 		got[attr.Key] = attr.Value.String()
 	}
 
-	for _, key := range []string{"OLLAMA_DEBUG", "OLLAMA_API_KEY", "OPENAI_API_KEY", "HF_TOKEN"} {
+	for _, key := range []string{"LOOM_DEBUG", "LOOM_API_KEY", "OPENAI_API_KEY", "HF_TOKEN"} {
 		if _, ok := got[key]; ok {
 			t.Fatalf("%s should not be logged: %#v", key, got)
 		}
@@ -2323,7 +2323,7 @@ func TestAppendJinjaArgs(t *testing.T) {
 			want: []string{"base"},
 		},
 		{
-			name:   "ollama rendered path disables unused jinja template",
+			name:   "loom rendered path disables unused jinja template",
 			config: LlamaServerConfig{DisableJinja: true},
 			want:   []string{"base", "--no-jinja", "--chat-template", "chatml"},
 		},
@@ -2470,15 +2470,15 @@ func setFlashAttentionEnv(t *testing.T, value string, set bool) {
 	t.Helper()
 
 	if set {
-		t.Setenv("OLLAMA_FLASH_ATTENTION", value)
+		t.Setenv("LOOM_FLASH_ATTENTION", value)
 		return
 	}
 
-	old, ok := os.LookupEnv("OLLAMA_FLASH_ATTENTION")
+	old, ok := os.LookupEnv("LOOM_FLASH_ATTENTION")
 	if ok {
-		t.Setenv("OLLAMA_FLASH_ATTENTION", old)
+		t.Setenv("LOOM_FLASH_ATTENTION", old)
 	}
-	os.Unsetenv("OLLAMA_FLASH_ATTENTION")
+	os.Unsetenv("LOOM_FLASH_ATTENTION")
 }
 
 func TestNormalizeEmbeddingError(t *testing.T) {
@@ -3138,7 +3138,7 @@ func TestMemoryParsingWriterMemorySizeMmapPartialOffload(t *testing.T) {
 		wantVRAMMiB   float64
 	}{
 		{
-			// Numbers from https://github.com/ollama/ollama/issues/16637: a
+			// Numbers from https://github.com/loom/loom/issues/16637: a
 			// 13.26 GiB MoE GGUF offloaded 48/49 layers with mmap on. The
 			// CPU_Mapped buffer spans nearly the whole file because the first
 			// and last tensors stay on CPU, re-counting the weights already

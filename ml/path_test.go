@@ -6,96 +6,96 @@ import (
 	"testing"
 )
 
-func TestFindLibOllamaPath(t *testing.T) {
+func TestFindLibLoomPath(t *testing.T) {
 	root := t.TempDir()
 
 	tests := []struct {
 		name   string
-		search libOllamaPathSearch
+		search libLoomPathSearch
 		dirs   []string
 		want   string
 	}{
 		{
 			name: "darwin release layout",
-			search: libOllamaPathSearch{
-				executable: filepath.Join(root, "darwin-app", "Ollama.app", "Contents", "Resources", "ollama"),
+			search: libLoomPathSearch{
+				executable: filepath.Join(root, "darwin-app", "Loom.app", "Contents", "Resources", "loom"),
 				goos:       "darwin",
 				goarch:     "arm64",
 			},
-			dirs: []string{filepath.Join(root, "darwin-app", "Ollama.app", "Contents", "Resources")},
-			want: filepath.Join(root, "darwin-app", "Ollama.app", "Contents", "Resources"),
+			dirs: []string{filepath.Join(root, "darwin-app", "Loom.app", "Contents", "Resources")},
+			want: filepath.Join(root, "darwin-app", "Loom.app", "Contents", "Resources"),
 		},
 		{
 			name: "darwin standard install layout",
-			search: libOllamaPathSearch{
-				executable: filepath.Join(root, "darwin-install", "bin", "ollama"),
+			search: libLoomPathSearch{
+				executable: filepath.Join(root, "darwin-install", "bin", "loom"),
 				goos:       "darwin",
 				goarch:     "arm64",
 			},
-			dirs: []string{filepath.Join(root, "darwin-install", "lib", "ollama")},
-			want: filepath.Join(root, "darwin-install", "lib", "ollama"),
+			dirs: []string{filepath.Join(root, "darwin-install", "lib", "loom")},
+			want: filepath.Join(root, "darwin-install", "lib", "loom"),
 		},
 		{
 			name: "windows release layout",
-			search: libOllamaPathSearch{
-				executable: filepath.Join(root, "windows-release", "ollama.exe"),
+			search: libLoomPathSearch{
+				executable: filepath.Join(root, "windows-release", "loom.exe"),
 				goos:       "windows",
 				goarch:     "amd64",
 			},
-			dirs: []string{filepath.Join(root, "windows-release", "lib", "ollama")},
-			want: filepath.Join(root, "windows-release", "lib", "ollama"),
+			dirs: []string{filepath.Join(root, "windows-release", "lib", "loom")},
+			want: filepath.Join(root, "windows-release", "lib", "loom"),
 		},
 		{
 			name: "windows standard install layout",
-			search: libOllamaPathSearch{
-				executable: filepath.Join(root, "windows-install", "bin", "ollama.exe"),
+			search: libLoomPathSearch{
+				executable: filepath.Join(root, "windows-install", "bin", "loom.exe"),
 				goos:       "windows",
 				goarch:     "amd64",
 			},
-			dirs: []string{filepath.Join(root, "windows-install", "lib", "ollama")},
-			want: filepath.Join(root, "windows-install", "lib", "ollama"),
+			dirs: []string{filepath.Join(root, "windows-install", "lib", "loom")},
+			want: filepath.Join(root, "windows-install", "lib", "loom"),
 		},
 		{
 			name: "linux standard install layout",
-			search: libOllamaPathSearch{
-				executable: filepath.Join(root, "linux-install", "bin", "ollama"),
+			search: libLoomPathSearch{
+				executable: filepath.Join(root, "linux-install", "bin", "loom"),
 				goos:       "linux",
 				goarch:     "amd64",
 			},
-			dirs: []string{filepath.Join(root, "linux-install", "lib", "ollama")},
-			want: filepath.Join(root, "linux-install", "lib", "ollama"),
+			dirs: []string{filepath.Join(root, "linux-install", "lib", "loom")},
+			want: filepath.Join(root, "linux-install", "lib", "loom"),
 		},
 		{
 			name: "local linux underscore dist layout",
-			search: libOllamaPathSearch{
-				executable: filepath.Join(root, "linux-dev", "ollama"),
+			search: libLoomPathSearch{
+				executable: filepath.Join(root, "linux-dev", "loom"),
 				workingDir: filepath.Join(root, "linux-dev"),
 				goos:       "linux",
 				goarch:     "amd64",
 			},
-			dirs: []string{filepath.Join(root, "linux-dev", "dist", "linux_amd64", "lib", "ollama")},
-			want: filepath.Join(root, "linux-dev", "dist", "linux_amd64", "lib", "ollama"),
+			dirs: []string{filepath.Join(root, "linux-dev", "dist", "linux_amd64", "lib", "loom")},
+			want: filepath.Join(root, "linux-dev", "dist", "linux_amd64", "lib", "loom"),
 		},
 		{
 			name: "mlx-only standard install layout",
-			search: libOllamaPathSearch{
-				executable: filepath.Join(root, "mlx-install", "bin", "ollama"),
+			search: libLoomPathSearch{
+				executable: filepath.Join(root, "mlx-install", "bin", "loom"),
 				goos:       "linux",
 				goarch:     "amd64",
 			},
-			dirs: []string{filepath.Join(root, "mlx-install", "lib", "ollama")},
-			want: filepath.Join(root, "mlx-install", "lib", "ollama"),
+			dirs: []string{filepath.Join(root, "mlx-install", "lib", "loom")},
+			want: filepath.Join(root, "mlx-install", "lib", "loom"),
 		},
 		{
 			name: "darwin local build layout before executable directory fallback",
-			search: libOllamaPathSearch{
-				executable: filepath.Join(root, "darwin-dev", "ollama"),
+			search: libLoomPathSearch{
+				executable: filepath.Join(root, "darwin-dev", "loom"),
 				workingDir: filepath.Join(root, "darwin-dev"),
 				goos:       "darwin",
 				goarch:     "arm64",
 			},
-			dirs: []string{filepath.Join(root, "darwin-dev", "build", "lib", "ollama")},
-			want: filepath.Join(root, "darwin-dev", "build", "lib", "ollama"),
+			dirs: []string{filepath.Join(root, "darwin-dev", "build", "lib", "loom")},
+			want: filepath.Join(root, "darwin-dev", "build", "lib", "loom"),
 		},
 	}
 
@@ -107,9 +107,9 @@ func TestFindLibOllamaPath(t *testing.T) {
 				}
 			}
 
-			got := findLibOllamaPath(tt.search)
+			got := findLibLoomPath(tt.search)
 			if got != tt.want {
-				t.Fatalf("findLibOllamaPath() = %q, want %q; candidates: %v", got, tt.want, libOllamaPathCandidates(tt.search))
+				t.Fatalf("findLibLoomPath() = %q, want %q; candidates: %v", got, tt.want, libLoomPathCandidates(tt.search))
 			}
 		})
 	}

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(ollama-llama-server C CXX)
+project(loom-llama-server C CXX)
 
 # Handle cross-compilation on macOS: when CMAKE_OSX_ARCHITECTURES is set to a
 # single architecture different from the host, make downstream architecture
@@ -30,17 +30,17 @@ if(GGML_VULKAN AND DEFINED ENV{VULKAN_SDK})
     # directories that CMake does not always find through the default prefix
     # search. Keep this narrow to the SDK layout so future llama.cpp bumps can
     # remove it if upstream's Vulkan dependency discovery becomes sufficient.
-    file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}" _ollama_vulkan_sdk)
-    list(APPEND CMAKE_PREFIX_PATH "${_ollama_vulkan_sdk}")
-    foreach(_ollama_spirv_headers_dir IN ITEMS
-            "${_ollama_vulkan_sdk}/Lib/cmake/SPIRV-Headers"
-            "${_ollama_vulkan_sdk}/lib/cmake/SPIRV-Headers"
-            "${_ollama_vulkan_sdk}/share/cmake/SPIRV-Headers"
-            "${_ollama_vulkan_sdk}/Lib/cmake"
-            "${_ollama_vulkan_sdk}/lib/cmake"
-            "${_ollama_vulkan_sdk}/share/cmake")
-        if(EXISTS "${_ollama_spirv_headers_dir}/SPIRV-HeadersConfig.cmake")
-            set(SPIRV-Headers_DIR "${_ollama_spirv_headers_dir}" CACHE PATH "SPIRV-Headers package directory")
+    file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}" _loom_vulkan_sdk)
+    list(APPEND CMAKE_PREFIX_PATH "${_loom_vulkan_sdk}")
+    foreach(_loom_spirv_headers_dir IN ITEMS
+            "${_loom_vulkan_sdk}/Lib/cmake/SPIRV-Headers"
+            "${_loom_vulkan_sdk}/lib/cmake/SPIRV-Headers"
+            "${_loom_vulkan_sdk}/share/cmake/SPIRV-Headers"
+            "${_loom_vulkan_sdk}/Lib/cmake"
+            "${_loom_vulkan_sdk}/lib/cmake"
+            "${_loom_vulkan_sdk}/share/cmake")
+        if(EXISTS "${_loom_spirv_headers_dir}/SPIRV-HeadersConfig.cmake")
+            set(SPIRV-Headers_DIR "${_loom_spirv_headers_dir}" CACHE PATH "SPIRV-Headers package directory")
             break()
         endif()
     endforeach()
@@ -52,13 +52,13 @@ if(WIN32 AND MINGW)
     add_compile_definitions(_WIN32_WINNT=0x0A00 WINVER=0x0A00)
 endif()
 
-function(ollama_set_cache_default name type value doc)
+function(loom_set_cache_default name type value doc)
     if(NOT DEFINED ${name} OR "${${name}}" STREQUAL "")
         set(${name} "${value}" CACHE ${type} "${doc}" FORCE)
     endif()
 endfunction()
 
-function(ollama_append_cache_flags name)
+function(loom_append_cache_flags name)
     set(_flags "${${name}}")
     foreach(_flag IN LISTS ARGN)
         string(FIND " ${_flags} " " ${_flag} " _found)
@@ -71,40 +71,40 @@ function(ollama_append_cache_flags name)
 endfunction()
 
 if(GGML_CUDA)
-    if(OLLAMA_RUNNER_DIR STREQUAL "cuda_v12")
-        ollama_set_cache_default(CMAKE_CUDA_ARCHITECTURES STRING
+    if(LOOM_RUNNER_DIR STREQUAL "cuda_v12")
+        loom_set_cache_default(CMAKE_CUDA_ARCHITECTURES STRING
             "native"
             "CUDA architectures")
-        ollama_set_cache_default(CMAKE_CUDA_FLAGS STRING
+        loom_set_cache_default(CMAKE_CUDA_FLAGS STRING
             "-Wno-deprecated-gpu-targets -t 2"
             "CUDA compiler flags")
-    elseif(OLLAMA_RUNNER_DIR STREQUAL "cuda_v13")
-        ollama_set_cache_default(CMAKE_CUDA_ARCHITECTURES STRING
+    elseif(LOOM_RUNNER_DIR STREQUAL "cuda_v13")
+        loom_set_cache_default(CMAKE_CUDA_ARCHITECTURES STRING
             "native" "CUDA architectures")
-        ollama_set_cache_default(CMAKE_CUDA_FLAGS STRING
+        loom_set_cache_default(CMAKE_CUDA_FLAGS STRING
             "-t 4" "CUDA compiler flags")
-    elseif(OLLAMA_RUNNER_DIR STREQUAL "cuda_jetpack5")
-        ollama_set_cache_default(CMAKE_CUDA_ARCHITECTURES STRING
+    elseif(LOOM_RUNNER_DIR STREQUAL "cuda_jetpack5")
+        loom_set_cache_default(CMAKE_CUDA_ARCHITECTURES STRING
             "native" "CUDA architectures")
-    elseif(OLLAMA_RUNNER_DIR STREQUAL "cuda_jetpack6")
-        ollama_set_cache_default(CMAKE_CUDA_ARCHITECTURES STRING
+    elseif(LOOM_RUNNER_DIR STREQUAL "cuda_jetpack6")
+        loom_set_cache_default(CMAKE_CUDA_ARCHITECTURES STRING
             "native" "CUDA architectures")
     endif()
 endif()
 
-if(GGML_HIP AND OLLAMA_RUNNER_DIR MATCHES "^rocm_v")
-    ollama_set_cache_default(CMAKE_HIP_FLAGS STRING
+if(GGML_HIP AND LOOM_RUNNER_DIR MATCHES "^rocm_v")
+    loom_set_cache_default(CMAKE_HIP_FLAGS STRING
         "-parallel-jobs=4" "HIP compiler flags")
     if(WIN32)
         # Windows ROCm split-load needs peer copies disabled for correctness.
-        ollama_set_cache_default(GGML_CUDA_NO_PEER_COPY BOOL ON
+        loom_set_cache_default(GGML_CUDA_NO_PEER_COPY BOOL ON
             "Disable direct peer device copies")
         # HIP on Windows currently emits attributes and deprecated pragma
         # warnings from ROCm headers. Keep the workaround local to Windows ROCm
         # so it can be removed when the ROCm toolchain no longer needs it.
-        ollama_append_cache_flags(CMAKE_C_FLAGS
+        loom_append_cache_flags(CMAKE_C_FLAGS
             -parallel-jobs=4 -Wno-ignored-attributes -Wno-deprecated-pragma)
-        ollama_append_cache_flags(CMAKE_CXX_FLAGS
+        loom_append_cache_flags(CMAKE_CXX_FLAGS
             -parallel-jobs=4 -Wno-ignored-attributes -Wno-deprecated-pragma)
     endif()
 endif()
@@ -115,49 +115,49 @@ include(FetchContent)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../../LLAMA_CPP_VERSION" LLAMA_CPP_GIT_TAG)
 string(STRIP "${LLAMA_CPP_GIT_TAG}" LLAMA_CPP_GIT_TAG)
 
-# Allow local source override via environment variable (like OLLAMA_MLX_SOURCE)
-if(DEFINED ENV{OLLAMA_LLAMA_CPP_SOURCE})
-    get_filename_component(_src "$ENV{OLLAMA_LLAMA_CPP_SOURCE}" ABSOLUTE BASE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+# Allow local source override via environment variable (like LOOM_MLX_SOURCE)
+if(DEFINED ENV{LOOM_LLAMA_CPP_SOURCE})
+    get_filename_component(_src "$ENV{LOOM_LLAMA_CPP_SOURCE}" ABSOLUTE BASE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
     set(FETCHCONTENT_SOURCE_DIR_LLAMA_CPP "${_src}" CACHE PATH "" FORCE)
     message(STATUS "Using local llama.cpp source: ${_src}")
 endif()
 
-# Ollama-compat shim: overlays the fetched llama.cpp source with a small
+# Loom-compat shim: overlays the fetched llama.cpp source with a small
 # in-memory translation layer for existing published model blobs.
 # See llama/compat/README.md for details.
 #
 # The patch runs for fetched sources and explicit FetchContent source
 # overrides, unless the caller prepared the source already. If
-# OLLAMA_LLAMA_CPP_SOURCE is set, leave the developer's tree alone so they can
+# LOOM_LLAMA_CPP_SOURCE is set, leave the developer's tree alone so they can
 # apply the patch by hand while iterating on the compat layer.
-set(_ollama_compat_patch_cmd "")
+set(_loom_compat_patch_cmd "")
 include(${CMAKE_CURRENT_SOURCE_DIR}/../compat/compat.cmake)
-option(OLLAMA_LLAMA_CPP_SKIP_COMPAT_PATCH
+option(LOOM_LLAMA_CPP_SKIP_COMPAT_PATCH
     "Skip llama.cpp compat patch application because the source is already prepared"
     OFF)
-set(_ollama_link_compat_sources OFF)
-if(OLLAMA_LLAMA_CPP_SKIP_COMPAT_PATCH)
-    set(_ollama_link_compat_sources ON)
-elseif(NOT DEFINED ENV{OLLAMA_LLAMA_CPP_SOURCE})
-    set(_ollama_link_compat_sources ON)
+set(_loom_link_compat_sources OFF)
+if(LOOM_LLAMA_CPP_SKIP_COMPAT_PATCH)
+    set(_loom_link_compat_sources ON)
+elseif(NOT DEFINED ENV{LOOM_LLAMA_CPP_SOURCE})
+    set(_loom_link_compat_sources ON)
     if(DEFINED FETCHCONTENT_SOURCE_DIR_LLAMA_CPP AND NOT FETCHCONTENT_SOURCE_DIR_LLAMA_CPP STREQUAL "")
         get_filename_component(_llama_cpp_source_override
             "${FETCHCONTENT_SOURCE_DIR_LLAMA_CPP}" ABSOLUTE)
         message(STATUS
-            "Applying Ollama llama.cpp compat patch to source override: "
+            "Applying Loom llama.cpp compat patch to source override: "
             "${_llama_cpp_source_override}")
         execute_process(
-            COMMAND ${OLLAMA_LLAMA_CPP_COMPAT_PATCH_COMMAND}
+            COMMAND ${LOOM_LLAMA_CPP_COMPAT_PATCH_COMMAND}
             WORKING_DIRECTORY "${_llama_cpp_source_override}"
-            RESULT_VARIABLE _ollama_compat_patch_result
+            RESULT_VARIABLE _loom_compat_patch_result
         )
-        if(NOT _ollama_compat_patch_result EQUAL 0)
+        if(NOT _loom_compat_patch_result EQUAL 0)
             message(FATAL_ERROR
-                "Failed to apply Ollama llama.cpp compat patch to "
+                "Failed to apply Loom llama.cpp compat patch to "
                 "${_llama_cpp_source_override}")
         endif()
     else()
-        set(_ollama_compat_patch_cmd PATCH_COMMAND ${OLLAMA_LLAMA_CPP_COMPAT_PATCH_COMMAND})
+        set(_loom_compat_patch_cmd PATCH_COMMAND ${LOOM_LLAMA_CPP_COMPAT_PATCH_COMMAND})
     endif()
 endif()
 
@@ -182,38 +182,38 @@ FetchContent_Declare(
     GIT_REPOSITORY "https://github.com/ggml-org/llama.cpp.git"
     GIT_TAG ${LLAMA_CPP_GIT_TAG}
     GIT_SHALLOW TRUE
-    ${_ollama_compat_patch_cmd}
+    ${_loom_compat_patch_cmd}
 )
 FetchContent_MakeAvailable(llama_cpp)
 
-# Link the Ollama-compat source files into the fetched llama target.
+# Link the Loom-compat source files into the fetched llama target.
 # Kept separate from the hook patch so our .cpp/.h stay
 # on-disk in llama/compat/ rather than being copied into _deps/.
-if(_ollama_link_compat_sources AND DEFINED OLLAMA_LLAMA_CPP_COMPAT_DIR)
+if(_loom_link_compat_sources AND DEFINED LOOM_LLAMA_CPP_COMPAT_DIR)
     file(GLOB _compat_sources CONFIGURE_DEPENDS
-        ${OLLAMA_LLAMA_CPP_COMPAT_DIR}/*.cpp)
+        ${LOOM_LLAMA_CPP_COMPAT_DIR}/*.cpp)
     foreach(_compat_target IN ITEMS llama mtmd)
         if(TARGET ${_compat_target})
             target_sources(${_compat_target} PRIVATE ${_compat_sources})
             target_include_directories(${_compat_target} PRIVATE
-                ${OLLAMA_LLAMA_CPP_COMPAT_DIR}
+                ${LOOM_LLAMA_CPP_COMPAT_DIR}
                 ${llama_cpp_SOURCE_DIR}/src)
         endif()
     endforeach()
     if(TARGET mtmd)
-        target_compile_definitions(mtmd PRIVATE OLLAMA_COMPAT_MTMD_BUILD)
+        target_compile_definitions(mtmd PRIVATE LOOM_COMPAT_MTMD_BUILD)
     endif()
 endif()
 
 # Link temporary architecture sources (llama/compat/models/*.cpp) into the
 # llama target only (not the mtmd projector lib).
-if(_ollama_link_compat_sources AND DEFINED OLLAMA_LLAMA_CPP_COMPAT_DIR)
-    file(GLOB _ollama_model_sources CONFIGURE_DEPENDS
-        ${OLLAMA_LLAMA_CPP_COMPAT_DIR}/models/*.cpp)
-    if(_ollama_model_sources AND TARGET llama)
-        target_sources(llama PRIVATE ${_ollama_model_sources})
+if(_loom_link_compat_sources AND DEFINED LOOM_LLAMA_CPP_COMPAT_DIR)
+    file(GLOB _loom_model_sources CONFIGURE_DEPENDS
+        ${LOOM_LLAMA_CPP_COMPAT_DIR}/models/*.cpp)
+    if(_loom_model_sources AND TARGET llama)
+        target_sources(llama PRIVATE ${_loom_model_sources})
         target_include_directories(llama PRIVATE
-            ${OLLAMA_LLAMA_CPP_COMPAT_DIR}/models
+            ${LOOM_LLAMA_CPP_COMPAT_DIR}/models
             ${llama_cpp_SOURCE_DIR}/src)
     endif()
 endif()
@@ -228,22 +228,22 @@ if(GGML_HIP)
     find_package(hip)
 endif()
 
-# Install layout under lib/ollama/:
+# Install layout under lib/loom/:
 #
-# CPU build (OLLAMA_RUNNER_DIR=""):
-#   lib/ollama/llama-server
-#   lib/ollama/libggml-base.so
-#   lib/ollama/libggml.so
-#   lib/ollama/libllama.so
-#   lib/ollama/libggml-cpu*.so  (all CPU variants)
+# CPU build (LOOM_RUNNER_DIR=""):
+#   lib/loom/llama-server
+#   lib/loom/libggml-base.so
+#   lib/loom/libggml.so
+#   lib/loom/libllama.so
+#   lib/loom/libggml-cpu*.so  (all CPU variants)
 #
-# GPU build (OLLAMA_RUNNER_DIR="cuda_v12" etc.):
-#   lib/ollama/cuda_v12/libggml-cuda.so  (GPU backend only)
+# GPU build (LOOM_RUNNER_DIR="cuda_v12" etc.):
+#   lib/loom/cuda_v12/libggml-cuda.so  (GPU backend only)
 
-set(OLLAMA_LIB_DIR "lib/ollama" CACHE STRING "Install destination for Ollama runtime payloads")
-set(_base_dest "${OLLAMA_LIB_DIR}")
+set(LOOM_LIB_DIR "lib/loom" CACHE STRING "Install destination for Loom runtime payloads")
+set(_base_dest "${LOOM_LIB_DIR}")
 
-function(ollama_append_newest_windows_runtime_family output)
+function(loom_append_newest_windows_runtime_family output)
     set(_runtime_dirs)
     foreach(_pattern IN LISTS ARGN)
         file(GLOB _dirs LIST_DIRECTORIES true "${_pattern}")
@@ -270,7 +270,7 @@ function(ollama_append_newest_windows_runtime_family output)
     endif()
 endfunction()
 
-function(ollama_append_mingw_runtime_dlls output)
+function(loom_append_mingw_runtime_dlls output)
     cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH _compiler_bin_dir)
     set(_runtime_dll_dir "${_compiler_bin_dir}")
 
@@ -278,8 +278,8 @@ function(ollama_append_mingw_runtime_dlls output)
     set(_runtime_target_triple)
     if(_compiler_name MATCHES "^([A-Za-z0-9_]+-w64-mingw32)-")
         set(_runtime_target_triple "${CMAKE_MATCH_1}")
-    elseif(DEFINED OLLAMA_WINDOWS_RUNTIME_ARCH)
-        string(TOLOWER "${OLLAMA_WINDOWS_RUNTIME_ARCH}" _runtime_arch)
+    elseif(DEFINED LOOM_WINDOWS_RUNTIME_ARCH)
+        string(TOLOWER "${LOOM_WINDOWS_RUNTIME_ARCH}" _runtime_arch)
         if(_runtime_arch MATCHES "^(arm64|aarch64)$")
             set(_runtime_target_triple "aarch64-w64-mingw32")
         elseif(_runtime_arch MATCHES "^(x64|amd64|x86_64)$")
@@ -326,16 +326,16 @@ function(ollama_append_mingw_runtime_dlls output)
     endif()
 endfunction()
 
-function(ollama_install_windows_runtime_dlls dest)
+function(loom_install_windows_runtime_dlls dest)
     if(NOT WIN32 OR NOT GGML_BACKEND_DL)
         return()
     endif()
 
-    set(_ollama_windows_runtime_arch "x64")
-    if(DEFINED OLLAMA_WINDOWS_RUNTIME_ARCH)
-        set(_ollama_windows_runtime_arch "${OLLAMA_WINDOWS_RUNTIME_ARCH}")
+    set(_loom_windows_runtime_arch "x64")
+    if(DEFINED LOOM_WINDOWS_RUNTIME_ARCH)
+        set(_loom_windows_runtime_arch "${LOOM_WINDOWS_RUNTIME_ARCH}")
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64)$")
-        set(_ollama_windows_runtime_arch "arm64")
+        set(_loom_windows_runtime_arch "arm64")
     endif()
 
     set(_crt_dir_patterns)
@@ -344,24 +344,24 @@ function(ollama_install_windows_runtime_dlls dest)
     if(DEFINED ENV{VCToolsRedistDir})
         file(TO_CMAKE_PATH "$ENV{VCToolsRedistDir}" _vc_tools_redist_dir)
         list(APPEND _crt_dir_patterns
-            "${_vc_tools_redist_dir}/${_ollama_windows_runtime_arch}/Microsoft.VC*.CRT")
+            "${_vc_tools_redist_dir}/${_loom_windows_runtime_arch}/Microsoft.VC*.CRT")
         list(APPEND _openmp_dir_patterns
-            "${_vc_tools_redist_dir}/${_ollama_windows_runtime_arch}/Microsoft.VC*.OpenMP*")
+            "${_vc_tools_redist_dir}/${_loom_windows_runtime_arch}/Microsoft.VC*.OpenMP*")
     endif()
 
     if(CMAKE_GENERATOR_INSTANCE)
         list(APPEND _crt_dir_patterns
-            "${CMAKE_GENERATOR_INSTANCE}/VC/Redist/MSVC/*/${_ollama_windows_runtime_arch}/Microsoft.VC*.CRT")
+            "${CMAKE_GENERATOR_INSTANCE}/VC/Redist/MSVC/*/${_loom_windows_runtime_arch}/Microsoft.VC*.CRT")
         list(APPEND _openmp_dir_patterns
-            "${CMAKE_GENERATOR_INSTANCE}/VC/Redist/MSVC/*/${_ollama_windows_runtime_arch}/Microsoft.VC*.OpenMP*")
+            "${CMAKE_GENERATOR_INSTANCE}/VC/Redist/MSVC/*/${_loom_windows_runtime_arch}/Microsoft.VC*.OpenMP*")
     endif()
 
     if(DEFINED ENV{VSINSTALLDIR})
         file(TO_CMAKE_PATH "$ENV{VSINSTALLDIR}" _vs_install_dir)
         list(APPEND _crt_dir_patterns
-            "${_vs_install_dir}/VC/Redist/MSVC/*/${_ollama_windows_runtime_arch}/Microsoft.VC*.CRT")
+            "${_vs_install_dir}/VC/Redist/MSVC/*/${_loom_windows_runtime_arch}/Microsoft.VC*.CRT")
         list(APPEND _openmp_dir_patterns
-            "${_vs_install_dir}/VC/Redist/MSVC/*/${_ollama_windows_runtime_arch}/Microsoft.VC*.OpenMP*")
+            "${_vs_install_dir}/VC/Redist/MSVC/*/${_loom_windows_runtime_arch}/Microsoft.VC*.OpenMP*")
     endif()
 
     if(MSVC)
@@ -373,15 +373,15 @@ function(ollama_install_windows_runtime_dlls dest)
         cmake_path(GET _tmp PARENT_PATH _msvc_ver_dir)
         # The redist version may differ from the toolset version.
         list(APPEND _crt_dir_patterns
-            "${_msvc_ver_dir}/../../../Redist/MSVC/*/${_ollama_windows_runtime_arch}/Microsoft.VC*.CRT")
+            "${_msvc_ver_dir}/../../../Redist/MSVC/*/${_loom_windows_runtime_arch}/Microsoft.VC*.CRT")
         list(APPEND _openmp_dir_patterns
-            "${_msvc_ver_dir}/../../../Redist/MSVC/*/${_ollama_windows_runtime_arch}/Microsoft.VC*.OpenMP*")
+            "${_msvc_ver_dir}/../../../Redist/MSVC/*/${_loom_windows_runtime_arch}/Microsoft.VC*.OpenMP*")
     endif()
 
     set(_runtime_dll_dirs)
-    ollama_append_newest_windows_runtime_family(_runtime_dll_dirs ${_crt_dir_patterns})
+    loom_append_newest_windows_runtime_family(_runtime_dll_dirs ${_crt_dir_patterns})
     if(GGML_OPENMP)
-        ollama_append_newest_windows_runtime_family(_runtime_dll_dirs ${_openmp_dir_patterns})
+        loom_append_newest_windows_runtime_family(_runtime_dll_dirs ${_openmp_dir_patterns})
     endif()
     if(_runtime_dll_dirs)
         list(REMOVE_DUPLICATES _runtime_dll_dirs)
@@ -395,7 +395,7 @@ function(ollama_install_windows_runtime_dlls dest)
         endif()
     endforeach()
     if(MINGW)
-        ollama_append_mingw_runtime_dlls(_runtime_dlls)
+        loom_append_mingw_runtime_dlls(_runtime_dlls)
     endif()
 
     if(_runtime_dlls)
@@ -408,7 +408,7 @@ function(ollama_install_windows_runtime_dlls dest)
     endif()
 endfunction()
 
-if(OLLAMA_RUNNER_DIR)
+if(LOOM_RUNNER_DIR)
     # GPU backend build: install the GPU backend .so/.dll module.
     # install(CODE) runs at install time so CMAKE_INSTALL_CONFIG_NAME is
     # available for multi-config generators. llama.cpp backend module target
@@ -422,23 +422,23 @@ if(OLLAMA_RUNNER_DIR)
         foreach(_dir IN LISTS _backend_dirs)
             file(GLOB _dir_gpu_backends
                 LIST_DIRECTORIES false
-                \"\${_dir}/libggml-${OLLAMA_GPU_BACKEND}*\"
-                \"\${_dir}/ggml-${OLLAMA_GPU_BACKEND}*.dll\"
+                \"\${_dir}/libggml-${LOOM_GPU_BACKEND}*\"
+                \"\${_dir}/ggml-${LOOM_GPU_BACKEND}*.dll\"
             )
             list(APPEND _gpu_backends \${_dir_gpu_backends})
         endforeach()
         foreach(_f \${_gpu_backends})
-            file(INSTALL \${_f} DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${_base_dest}/${OLLAMA_RUNNER_DIR}\")
+            file(INSTALL \${_f} DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${_base_dest}/${LOOM_RUNNER_DIR}\")
         endforeach()
     " COMPONENT llama-server)
 
-    ollama_install_windows_runtime_dlls("${_base_dest}/${OLLAMA_RUNNER_DIR}")
+    loom_install_windows_runtime_dlls("${_base_dest}/${LOOM_RUNNER_DIR}")
 
     # Bundle GPU runtime libraries (cublas, cudart, rocblas, etc.)
     # These are needed at runtime by the GPU backend .so
     if(GGML_CUDA AND CUDAToolkit_FOUND)
-        if(DEFINED OLLAMA_WINDOWS_RUNTIME_ARCH)
-            string(TOLOWER "${OLLAMA_WINDOWS_RUNTIME_ARCH}" _cuda_redist_arch)
+        if(DEFINED LOOM_WINDOWS_RUNTIME_ARCH)
+            string(TOLOWER "${LOOM_WINDOWS_RUNTIME_ARCH}" _cuda_redist_arch)
             if(_cuda_redist_arch MATCHES "^(x64|amd64|x86_64)$")
                 set(_cuda_redist_arch "x64")
             elseif(_cuda_redist_arch MATCHES "^(arm64|aarch64)$")
@@ -458,8 +458,8 @@ if(OLLAMA_RUNNER_DIR)
                     DIRECTORIES ${_cuda_redist_dir} ${CUDAToolkit_BIN_DIR} ${CUDAToolkit_LIBRARY_DIR}
                     PRE_INCLUDE_REGEXES cublas cublasLt cudart
                     PRE_EXCLUDE_REGEXES ".*"
-                RUNTIME DESTINATION "${_base_dest}/${OLLAMA_RUNNER_DIR}" COMPONENT llama-server
-                LIBRARY DESTINATION "${_base_dest}/${OLLAMA_RUNNER_DIR}" COMPONENT llama-server
+                RUNTIME DESTINATION "${_base_dest}/${LOOM_RUNNER_DIR}" COMPONENT llama-server
+                LIBRARY DESTINATION "${_base_dest}/${LOOM_RUNNER_DIR}" COMPONENT llama-server
             )
         endif()
     endif()
@@ -467,16 +467,16 @@ if(OLLAMA_RUNNER_DIR)
         if(TARGET ggml-hip)
             install(TARGETS ggml-hip
                 RUNTIME_DEPENDENCY_SET rocm_deps
-                RUNTIME DESTINATION "${_base_dest}/${OLLAMA_RUNNER_DIR}" COMPONENT llama-server
-                LIBRARY DESTINATION "${_base_dest}/${OLLAMA_RUNNER_DIR}" COMPONENT llama-server
+                RUNTIME DESTINATION "${_base_dest}/${LOOM_RUNNER_DIR}" COMPONENT llama-server
+                LIBRARY DESTINATION "${_base_dest}/${LOOM_RUNNER_DIR}" COMPONENT llama-server
             )
             install(RUNTIME_DEPENDENCY_SET rocm_deps
                 DIRECTORIES ${HIP_BIN_INSTALL_DIR} ${HIP_LIB_INSTALL_DIR}
                 PRE_INCLUDE_REGEXES hipblas rocblas amdhip64 rocsolver amd_comgr hsa-runtime64 rocsparse tinfo rocprofiler-register roctx64 rocroller drm drm_amdgpu numa elf
                 PRE_EXCLUDE_REGEXES ".*"
                 POST_EXCLUDE_REGEXES "system32"
-                RUNTIME DESTINATION "${_base_dest}/${OLLAMA_RUNNER_DIR}" COMPONENT llama-server
-                LIBRARY DESTINATION "${_base_dest}/${OLLAMA_RUNNER_DIR}" COMPONENT llama-server
+                RUNTIME DESTINATION "${_base_dest}/${LOOM_RUNNER_DIR}" COMPONENT llama-server
+                LIBRARY DESTINATION "${_base_dest}/${LOOM_RUNNER_DIR}" COMPONENT llama-server
             )
             if(WIN32)
                 # HIP delay-loads COMGR on Windows, so CMake's runtime
@@ -493,7 +493,7 @@ if(OLLAMA_RUNNER_DIR)
                 if(_rocm_companion_dlls)
                     list(REMOVE_DUPLICATES _rocm_companion_dlls)
                     install(FILES ${_rocm_companion_dlls}
-                        DESTINATION "${_base_dest}/${OLLAMA_RUNNER_DIR}"
+                        DESTINATION "${_base_dest}/${LOOM_RUNNER_DIR}"
                         COMPONENT llama-server)
                 else()
                     message(FATAL_ERROR "Could not find ROCm COMGR runtime DLLs to bundle")
@@ -502,7 +502,7 @@ if(OLLAMA_RUNNER_DIR)
             foreach(_hip_dir IN ITEMS ${HIP_BIN_INSTALL_DIR} ${HIP_LIB_INSTALL_DIR})
                 if(EXISTS ${_hip_dir}/rocblas)
                     install(DIRECTORY ${_hip_dir}/rocblas
-                        DESTINATION "${_base_dest}/${OLLAMA_RUNNER_DIR}"
+                        DESTINATION "${_base_dest}/${LOOM_RUNNER_DIR}"
                         COMPONENT llama-server)
                     break()
                 endif()
@@ -512,8 +512,8 @@ if(OLLAMA_RUNNER_DIR)
     if(GGML_VULKAN)
         if(TARGET ggml-vulkan)
             install(TARGETS ggml-vulkan
-                RUNTIME DESTINATION "${_base_dest}/${OLLAMA_RUNNER_DIR}" COMPONENT llama-server
-                LIBRARY DESTINATION "${_base_dest}/${OLLAMA_RUNNER_DIR}" COMPONENT llama-server
+                RUNTIME DESTINATION "${_base_dest}/${LOOM_RUNNER_DIR}" COMPONENT llama-server
+                LIBRARY DESTINATION "${_base_dest}/${LOOM_RUNNER_DIR}" COMPONENT llama-server
             )
         endif()
     endif()
@@ -540,7 +540,7 @@ else()
 
     # Bundle Windows CRT DLLs alongside the executables so zip installs
     # do not depend on host-global redistributables.
-    ollama_install_windows_runtime_dlls("${_base_dest}")
+    loom_install_windows_runtime_dlls("${_base_dest}")
 
     # CPU backend modules (multiple variants from GGML_CPU_ALL_VARIANTS).
     # install(CODE) runs at install time so CMAKE_INSTALL_CONFIG_NAME is

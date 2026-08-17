@@ -3,9 +3,9 @@ package mlxrunner
 import (
 	"fmt"
 
-	"github.com/ollama/ollama/x/mlxrunner/batch"
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
-	sampler "github.com/ollama/ollama/x/mlxrunner/sample"
+	"github.com/loom/loom/x/mlxrunner/batch"
+	"github.com/loom/loom/x/mlxrunner/mlx"
+	sampler "github.com/loom/loom/x/mlxrunner/sample"
 )
 
 // mtpPendingFlushTokens caps how many committed look-ahead tokens wait in the

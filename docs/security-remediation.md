@@ -1,6 +1,6 @@
-# Ollama Security & Scalability Remediation Blueprint
+# Loom Security & Scalability Remediation Blueprint
 
-This document addresses the structural vulnerabilities, concurrency race conditions, and scaling bottlenecks identified in Ollama's dynamic agentic architecture. Below is our blueprint to bridge these gaps, transitioning the system from a capability-first prototype to a hardened, production-grade local AI runtime.
+This document addresses the structural vulnerabilities, concurrency race conditions, and scaling bottlenecks identified in Loom's dynamic agentic architecture. Below is our blueprint to bridge these gaps, transitioning the system from a capability-first prototype to a hardened, production-grade local AI runtime.
 
 ---
 
@@ -86,7 +86,7 @@ This document addresses the structural vulnerabilities, concurrency race conditi
 ### Robust User Identity Scoping
 * **The Vulnerability:** Identifying users by peer IP address fails under Network Address Translation (NAT) or dynamic IP allocation.
 * **Remediation Plan:**
-  We deprecate peer-IP mapping. The server now expects a cryptographically secure session cookie or a `X-Ollama-User-ID` header. If missing, the request defaults to a local guest profile, isolating memories securely.
+  We deprecate peer-IP mapping. The server now expects a cryptographically secure session cookie or a `X-Loom-User-ID` header. If missing, the request defaults to a local guest profile, isolating memories securely.
 
 ### Portability of Exported Memory (GOB vs. JSON)
 * **The Vulnerability:** While Go's binary `encoding/gob` format is highly efficient, it is Go-specific and brittle. If struct fields are renamed in future updates, old exports become unreadable, and non-Go clients cannot parse the data.
@@ -100,4 +100,4 @@ This document addresses the structural vulnerabilities, concurrency race conditi
 
 ---
 
-This blueprint serves as our roadmap to transition Ollama's agentic features into a secure, production-ready environment. Detailed code modifications implementing these remediations will follow this design specification.
+This blueprint serves as our roadmap to transition Loom's agentic features into a secure, production-ready environment. Detailed code modifications implementing these remediations will follow this design specification.

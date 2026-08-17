@@ -3,7 +3,7 @@ package parsers
 import (
 	"testing"
 
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
 func lagunaTestTools() []api.Tool {

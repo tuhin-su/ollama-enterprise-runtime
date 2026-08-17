@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/server/memory"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/server/memory"
 )
 
 // memoryEngine is the global singleton engine. It is nil when the memory

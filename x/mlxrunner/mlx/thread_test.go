@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ollama/ollama/x/internal/mlxthread"
+	"github.com/loom/loom/x/internal/mlxthread"
 )
 
 func skipIfNoMLX(t *testing.T) {

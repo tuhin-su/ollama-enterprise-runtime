@@ -9,11 +9,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/ollama/ollama/api"
+	"github.com/loom/loom/api"
 )
 
-const DefaultUpgradeURL = "https://ollama.com/pricing"
-var ErrPlanVerificationUnavailable = errors.New("Could not verify Ollama plan. Try again in a moment or use a local model.")
+const DefaultUpgradeURL = "https://loom.com/pricing"
+var ErrPlanVerificationUnavailable = errors.New("Could not verify Loom plan. Try again in a moment or use a local model.")
 
 func PlanSatisfies(currentPlan, requiredPlan string) bool {
 	required := normalizePlan(requiredPlan)
@@ -248,7 +248,7 @@ func renderUpgrade(modelName string, spinner, width int, polling, openNow bool) 
 
 	var s strings.Builder
 
-	fmt.Fprintf(&s, "To use %s, upgrade your Ollama plan.\n\n", selectorSelectedItemStyle.Render(modelName))
+	fmt.Fprintf(&s, "To use %s, upgrade your Loom plan.\n\n", selectorSelectedItemStyle.Render(modelName))
 
 	s.WriteString("Navigate to:\n")
 	s.WriteString(urlWrap.Render(urlColor.Render(DefaultUpgradeURL)))

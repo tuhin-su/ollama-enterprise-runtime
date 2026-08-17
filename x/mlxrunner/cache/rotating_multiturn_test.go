@@ -3,7 +3,7 @@ package cache
 import (
 	"testing"
 
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/mlxrunner/mlx"
 )
 
 // singleTokenKV and multiTokenKV fabricate [B=1, H=1, L, D=2] key/value

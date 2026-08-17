@@ -16,8 +16,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/openai"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/openai"
 )
 
 // testPropsMap creates a ToolPropertiesMap from a map (convenience function for tests)

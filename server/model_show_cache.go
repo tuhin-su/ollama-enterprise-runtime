@@ -14,12 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ollama/ollama/api"
-	internalcloud "github.com/ollama/ollama/internal/cloud"
-	"github.com/ollama/ollama/internal/modelref"
-	"github.com/ollama/ollama/manifest"
-	"github.com/ollama/ollama/types/model"
-	"github.com/ollama/ollama/version"
+	"github.com/loom/loom/api"
+	internalcloud "github.com/loom/loom/internal/cloud"
+	"github.com/loom/loom/internal/modelref"
+	"github.com/loom/loom/manifest"
+	"github.com/loom/loom/types/model"
+	"github.com/loom/loom/version"
 )
 
 /*
@@ -46,7 +46,7 @@ carry a model-name field to reconstruct on the way out.
 
 The cache is process-local. Cloud startup hydration runs asynchronously from
 cloud tags, while local show responses are populated on demand. No show
-responses are written to or read from ~/.ollama/cache/show. That keeps cache
+responses are written to or read from ~/.loom/cache/show. That keeps cache
 lifetime tied to the server process and avoids snapshot freshness and
 invalidation cases for this iteration.
 */

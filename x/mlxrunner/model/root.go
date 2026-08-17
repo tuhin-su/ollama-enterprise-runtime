@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	modeltypes "github.com/ollama/ollama/types/model"
-	"github.com/ollama/ollama/x/imagegen/manifest"
+	modeltypes "github.com/loom/loom/types/model"
+	"github.com/loom/loom/x/imagegen/manifest"
 )
 
 // TensorQuantInfo describes per-tensor quantization metadata.

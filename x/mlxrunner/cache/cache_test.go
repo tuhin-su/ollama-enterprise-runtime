@@ -3,8 +3,8 @@ package cache
 import (
 	"testing"
 
-	"github.com/ollama/ollama/x/mlxrunner/batch"
-	"github.com/ollama/ollama/x/mlxrunner/mlx"
+	"github.com/loom/loom/x/mlxrunner/batch"
+	"github.com/loom/loom/x/mlxrunner/mlx"
 )
 
 func skipIfNoMLX(t *testing.T) {

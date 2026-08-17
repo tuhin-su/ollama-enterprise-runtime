@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ollama/ollama/llm"
-	"github.com/ollama/ollama/logutil"
-	"github.com/ollama/ollama/ml"
+	"github.com/loom/loom/llm"
+	"github.com/loom/loom/logutil"
+	"github.com/loom/loom/ml"
 )
 
 // llamaServerDiscoveryWaitDelay bounds how long Wait can hang after we stop
@@ -496,8 +496,8 @@ func isIntegratedLlamaServerDevice(library string, deviceIndex int, integratedBy
 	return library == "Metal" && runtime.GOOS == "darwin" && runtime.GOARCH == "arm64"
 }
 
-func llamaServerBootstrapDevicesWithStatus(ctx context.Context, ollamaLibDirs []string, extraEnvs map[string]string) ([]ml.DeviceInfo, *llm.StatusWriter, error) {
-	devices, status, err := llamaServerDiscoverDevices(ctx, ollamaLibDirs, extraEnvs)
+func llamaServerBootstrapDevicesWithStatus(ctx context.Context, loomLibDirs []string, extraEnvs map[string]string) ([]ml.DeviceInfo, *llm.StatusWriter, error) {
+	devices, status, err := llamaServerDiscoverDevices(ctx, loomLibDirs, extraEnvs)
 	if err != nil {
 		return devices, status, err
 	}
@@ -513,7 +513,7 @@ func llamaServerBootstrapDevicesWithStatus(ctx context.Context, ollamaLibDirs []
 		return devices, status, nil
 	}
 
-	return filterUnsupportedROCmDevices(devices, ollamaLibDirs), status, nil
+	return filterUnsupportedROCmDevices(devices, loomLibDirs), status, nil
 }
 
 // Ensure stderrPipe is fully consumed to avoid blocking

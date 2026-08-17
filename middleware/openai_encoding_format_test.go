@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ollama/ollama/api"
-	"github.com/ollama/ollama/openai"
+	"github.com/loom/loom/api"
+	"github.com/loom/loom/openai"
 )
 
 func TestEmbeddingsMiddleware_EncodingFormats(t *testing.T) {

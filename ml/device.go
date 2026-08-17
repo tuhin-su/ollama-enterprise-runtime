@@ -18,8 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ollama/ollama/format"
-	"github.com/ollama/ollama/logutil"
+	"github.com/loom/loom/format"
+	"github.com/loom/loom/logutil"
 )
 
 // GPULayers is a set of layers to be allocated on a single GPU
@@ -422,7 +422,7 @@ func ByLibrary(l []DeviceInfo) [][]DeviceInfo {
 }
 
 func LibraryPaths(l []DeviceInfo) []string {
-	gpuLibs := []string{LibOllamaPath}
+	gpuLibs := []string{LibLoomPath}
 	for _, gpu := range l {
 		for _, dir := range gpu.LibraryPath {
 			needed := true
