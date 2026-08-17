@@ -156,7 +156,7 @@ func DefaultConfig() Config {
 		RabbitMQEnabled:          false,
 		RabbitMQURL:              "http://localhost:15672/api/exchanges/%2F/amq.default/publish",
 		HeartbeatIntervalSeconds: 30,
-		Host:                     "127.0.0.1:11434",
+		Host:                     "0.0.0.0:11434",
 		ModelsDir:                modelsDir,
 		Debug:                    false,
 		ChainEnabled:             true,
