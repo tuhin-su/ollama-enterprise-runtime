@@ -16,7 +16,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/loom/loom/api"
 	internalcloud "github.com/loom/loom/internal/cloud"
-	"github.com/loom/loom/middleware"
 	"github.com/loom/loom/version"
 )
 
@@ -936,7 +935,6 @@ func TestCloudPassthroughSkipsAnthropicWebSearch(t *testing.T) {
 	router.POST(
 		"/v1/messages",
 		cloudPassthroughMiddleware(cloudErrRemoteInferenceUnavailable),
-		middleware.AnthropicMessagesMiddleware(),
 		func(c *gin.Context) { c.Status(http.StatusTeapot) },
 	)
 
@@ -995,7 +993,6 @@ func TestCloudPassthroughSkipsAnthropicWebSearchLegacySuffix(t *testing.T) {
 	router.POST(
 		"/v1/messages",
 		cloudPassthroughMiddleware(cloudErrRemoteInferenceUnavailable),
-		middleware.AnthropicMessagesMiddleware(),
 		func(c *gin.Context) { c.Status(http.StatusTeapot) },
 	)
 
