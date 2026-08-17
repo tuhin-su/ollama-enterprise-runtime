@@ -364,12 +364,18 @@ func minInt(a, b int) int {
 // ---------------------------------------------------------------------------
 
 type serverJSON struct {
-	Memory       Config `json:"memory"`
-	DefaultModel string `json:"default_model"`
-	LogPath      string `json:"log_path"`
+	Host                     string `json:"host"`
+	ModelsDir                string `json:"models_dir"`
+	DefaultModel             string `json:"default_model"`
+	LogPath                  string `json:"log_path"`
+	Debug                    bool   `json:"debug"`
+	RabbitMQEnabled          bool   `json:"rabbitmq_enabled"`
+	RabbitMQURL              string `json:"rabbitmq_url"`
+	HeartbeatIntervalSeconds int    `json:"heartbeat_interval_seconds"`
+	Memory                   Config `json:"memory"`
 }
 
-// LoadConfig reads ~/.loom/server.json and merges the "memory" section.
+// LoadConfig reads ~/.loom/server.json and merges configuration parameters.
 // If server.json does not exist, it guarantees robust production defaults and creates the default server.json file.
 func LoadConfig() Config {
 	cfg := DefaultConfig()
@@ -385,12 +391,18 @@ func LoadConfig() Config {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Auto-generate robust default server.json if missing
+			// Auto-generate robust default server.json with all top-level parameters
 			_ = os.MkdirAll(configDir, 0755)
 			defaultJSON := serverJSON{
-				Memory:       cfg,
-				DefaultModel: cfg.DefaultModel,
-				LogPath:      cfg.LogPath,
+				Host:                     cfg.Host,
+				ModelsDir:                cfg.ModelsDir,
+				DefaultModel:             cfg.DefaultModel,
+				LogPath:                  cfg.LogPath,
+				Debug:                    cfg.Debug,
+				RabbitMQEnabled:          cfg.RabbitMQEnabled,
+				RabbitMQURL:              cfg.RabbitMQURL,
+				HeartbeatIntervalSeconds: cfg.HeartbeatIntervalSeconds,
+				Memory:                   cfg,
 			}
 			if bytes, marshalErr := json.MarshalIndent(defaultJSON, "", "  "); marshalErr == nil {
 				_ = os.WriteFile(configFile, bytes, 0644)
@@ -407,11 +419,26 @@ func LoadConfig() Config {
 	}
 
 	cfg.Merge(sj.Memory)
-	if sj.DefaultModel != "" && cfg.DefaultModel == "" {
+	if sj.DefaultModel != "" {
 		cfg.DefaultModel = sj.DefaultModel
 	}
-	if sj.LogPath != "" && cfg.LogPath == "" {
+	if sj.LogPath != "" {
 		cfg.LogPath = sj.LogPath
 	}
+	if sj.Host != "" {
+		cfg.Host = sj.Host
+	}
+	if sj.ModelsDir != "" {
+		cfg.ModelsDir = sj.ModelsDir
+	}
+	if sj.RabbitMQURL != "" {
+		cfg.RabbitMQURL = sj.RabbitMQURL
+	}
+	if sj.HeartbeatIntervalSeconds > 0 {
+		cfg.HeartbeatIntervalSeconds = sj.HeartbeatIntervalSeconds
+	}
+	cfg.RabbitMQEnabled = sj.RabbitMQEnabled
+	cfg.Debug = sj.Debug
+
 	return cfg
 }
