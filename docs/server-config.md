@@ -1,104 +1,47 @@
-# Server Configuration
+# Loom Server Configuration Guide (`~/.loom/server.json`)
 
-Loom's server behaviour can be tuned by creating `~/.loom/server.json`.
-The file is read at startup and merged with built-in defaults.
+Loom's behavior is controlled entirely by `~/.loom/server.json`. This file is loaded at startup and merged with built-in production defaults.
 
----
-
-## Full Example
-
-```json
-{
-  "api_token": "your-secret-token",
-  "memory": {
-    "enabled": true,
-    "embedding_model": "nomic-embed-text"
-  }
-}
-```
+> [!NOTE]
+> If `~/.loom/server.json` does not exist when Loom starts, the server **automatically creates it** with complete, production-ready default values.
 
 ---
 
-## Token Authentication
-
-By default the Loom API is **unauthenticated** and accessible to anyone who
-can reach the server's port. When `api_token` is set, every API request must
-include a matching `Authorization` header.
-
-### Setting a token
-
-Add `api_token` to `~/.loom/server.json`:
+## Complete Auto-Generated `server.json` Template
 
 ```json
 {
-  "api_token": "my-super-secret-token"
-}
-```
-
-Restart `loom serve` for the change to take effect.
-
-### How it works
-
-- The server enforces `Authorization: Bearer <token>` on **all** endpoints
-  except the health-check (`GET /` and `HEAD /`).
-- The `loom` CLI reads the same `server.json` file and **automatically**
-  attaches the token to every local request — no manual configuration needed.
-- Requests without a valid token receive `401 Unauthorized`.
-
-### Using the API manually
-
-```bash
-# With token auth enabled
-curl http://localhost:11434/api/chat \
-  -H "Authorization: Bearer my-super-secret-token" \
-  -d '{
-    "model": "gemma4",
-    "messages": [{"role": "user", "content": "Hello"}],
-    "stream": false
-  }'
-```
-
-### Security notes
-
-- The token is stored in plain text in `~/.loom/server.json`. Protect the
-  file with appropriate filesystem permissions (`chmod 600`).
-- Token auth is intended for **single-machine** or **LAN** deployments. For
-  internet-facing deployments, put Loom behind a reverse proxy with TLS.
-- Cloud model requests to `loom.com` continue to use SSH key authentication
-  (`~/.loom/id_ed25519`) regardless of the local token setting.
-
----
-
-## Memory System
-
-See [memory.md](memory.md) for the full reference.
-
-### Minimal enable
-
-```json
-{
+  "host": "127.0.0.1:11434",
+  "models_dir": "/home/user/.loom/models",
+  "default_model": "",
+  "log_path": "/home/user/.loom/server.log",
+  "debug": false,
+  "rabbitmq_enabled": false,
+  "rabbitmq_url": "http://localhost:15672/api/exchanges/%2F/amq.default/publish",
+  "heartbeat_interval_seconds": 30,
   "memory": {
-    "enabled": true,
-    "embedding_model": "nomic-embed-text"
-  }
-}
-```
-
-### Combined example
-
-```json
-{
-  "api_token": "my-secret-token",
-  "memory": {
-    "enabled": true,
+    "enabled": false,
+    "db_path": "/home/user/.loom/memory.lance",
     "embedding_model": "nomic-embed-text",
-    "top_k": 15,
-    "max_prompt_memories": 8,
+    "chain_enabled": true,
+    "chain_max_steps": 10,
+    "top_k": 20,
+    "similarity_threshold": 0.65,
+    "importance_threshold": 0.3,
+    "decay_rate": 0.01,
+    "cache_size": 10000,
+    "cache_max_cost": 67108864,
+    "cache_ttl": "5m0s",
+    "worker_count": 4,
+    "max_prompt_memories": 10,
+    "max_prompt_tokens": 2048,
+    "decay_interval_hours": 24,
+    "archive_after_days": 90,
     "ranking": {
-      "similarity": 0.5,
-      "recency": 0.3,
-      "importance": 0.1,
-      "frequency": 0.05,
+      "similarity": 0.4,
+      "importance": 0.25,
+      "recency": 0.2,
+      "frequency": 0.1,
       "pinned": 0.05
     }
   }
@@ -107,28 +50,58 @@ See [memory.md](memory.md) for the full reference.
 
 ---
 
-## All Options
+## Detailed Option Reference
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `api_token` | string | `""` | Bearer token for API authentication. Empty = no auth. |
-| `memory.enabled` | bool | `false` | Enable long-term memory system. |
-| `memory.db_path` | string | `~/.loom/memory.lance` | LanceDB database path. |
-| `memory.embedding_model` | string | `nomic-embed-text` | Model for generating embeddings. |
-| `memory.top_k` | int | `20` | Vector search candidates before ranking. |
-| `memory.similarity_threshold` | float | `0.65` | Minimum cosine similarity (0–1). |
-| `memory.importance_threshold` | float | `0.3` | Minimum importance to store a memory. |
-| `memory.decay_rate` | float | `0.01` | Daily importance decay rate. |
-| `memory.cache_size` | int | `10000` | Ristretto cache item count limit. |
-| `memory.cache_max_cost` | int | `67108864` | Ristretto max cost in bytes (64 MiB). |
-| `memory.cache_ttl` | duration | `"5m"` | Default cache TTL. |
-| `memory.worker_count` | int | `4` | Background worker goroutines. |
-| `memory.max_prompt_memories` | int | `10` | Max memories injected per request. |
-| `memory.max_prompt_tokens` | int | `2048` | Token budget for memory context. |
-| `memory.decay_interval_hours` | int | `24` | Hours between decay runs. |
-| `memory.archive_after_days` | int | `90` | Days before archiving unused memories. |
-| `memory.ranking.similarity` | float | `0.4` | Weight for vector similarity score. |
-| `memory.ranking.importance` | float | `0.25` | Weight for stored importance. |
-| `memory.ranking.recency` | float | `0.2` | Weight for recency decay score. |
-| `memory.ranking.frequency` | float | `0.1` | Weight for access frequency. |
-| `memory.ranking.pinned` | float | `0.05` | Boost for pinned memories. |
+### 1. Server & Connectivity Settings
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `host` | `string` | `"127.0.0.1:11434"` | IP address and port Loom binds to. Use `"0.0.0.0:11434"` for external network access. |
+| `models_dir` | `string` | `"~/.loom/models"` | Directory path where local model weights and manifests are stored. |
+| `default_model` | `string` | `""` | Fallback model name when a request omits a model. |
+| `log_path` | `string` | `"~/.loom/server.log"` | Path to the main server diagnostic log file. |
+| `debug` | `boolean` | `false` | Enable verbose debug logging across model execution and tool routing. |
+
+---
+
+### 2. Autonomous Heartbeat & Telemetry
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `heartbeat_interval_seconds` | `integer` | `30` | Interval (in seconds) for the 24/7 background heartbeat monitor that checks loaded models for idle task execution or memory unloading. |
+| `rabbitmq_enabled` | `boolean` | `false` | Activate real-time non-blocking event streaming to an external RabbitMQ broker. |
+| `rabbitmq_url` | `string` | `"http://localhost:15672/..."` | AMQP / RabbitMQ HTTP Management API endpoint URL for dataflow telemetry. |
+
+---
+
+### 3. Enterprise RAG & Memory Subsystem (`memory`)
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `memory.enabled` | `boolean` | `false` | Enables long-term vector RAG memory middleware. |
+| `memory.db_path` | `string` | `"~/.loom/memory.lance"` | LanceDB vector database storage directory. |
+| `memory.embedding_model` | `string` | `"nomic-embed-text"` | Model used for vector embeddings. |
+| `memory.chain_enabled` | `boolean` | `true` | Enables multi-model pipeline chaining (`chain_request`). |
+| `memory.chain_max_steps` | `integer` | `10` | Maximum subtask steps allowed in a single model pipeline. |
+| `memory.top_k` | `integer` | `20` | Candidate vector results fetched before RRF ranking pass. |
+| `memory.similarity_threshold` | `float` | `0.65` | Minimum cosine similarity score for memory context inclusion. |
+| `memory.importance_threshold` | `float` | `0.3` | Minimum importance score required to save a new memory. |
+| `memory.worker_count` | `integer` | `4` | Number of background worker goroutines. |
+| `memory.max_prompt_memories` | `integer` | `10` | Maximum memories injected into system prompt per chat turn. |
+| `memory.max_prompt_tokens` | `integer` | `2048` | Maximum token budget spent on memory context injection. |
+
+---
+
+### 4. Memory Multi-Signal Ranking Weights (`memory.ranking`)
+
+Loom uses a multi-signal scoring algorithm to rank relevant memories before prompt injection:
+
+$$\text{Score} = w_{\text{sim}} \cdot \text{Similarity} + w_{\text{imp}} \cdot \text{Importance} + w_{\text{rec}} \cdot \text{Recency} + w_{\text{freq}} \cdot \text{Frequency} + w_{\text{pin}} \cdot \text{Pinned}$$
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `memory.ranking.similarity` | `float` | `0.4` | Weight given to vector semantic similarity. |
+| `memory.ranking.importance` | `float` | `0.25` | Weight given to stored importance score. |
+| `memory.ranking.recency` | `float` | `0.2` | Weight given to recency decay. |
+| `memory.ranking.frequency` | `float` | `0.1` | Weight given to memory access count. |
+| `memory.ranking.pinned` | `float` | `0.05` | Score boost for pinned memories. |
