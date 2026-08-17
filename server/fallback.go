@@ -178,7 +178,10 @@ func (fm *FallbackManager) resolveFallbackModel(primary string, s *Server) strin
 	fm.mu.RUnlock()
 
 	// Dynamic resolution: pick any other loaded/available model from local manifests
-	models, err := s.listModels(context.Background())
+	if s.modelCaches == nil || s.modelCaches.modelList == nil {
+		return ""
+	}
+	models, err := s.modelCaches.modelList.List(context.Background())
 	if err != nil || len(models) == 0 {
 		return ""
 	}

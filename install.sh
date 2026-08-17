@@ -49,16 +49,27 @@ else
     echo -e "${GREEN}LanceDB native artifacts already present.${NC}"
 fi
 
-# 2. Build Loom binary
-echo -e "${BLUE}Building Loom with LanceDB storage engine...${NC}"
-ROOT_DIR=$(pwd)
+FORCE_BUILD=false
+for arg in "$@"; do
+    if [[ "$arg" == "--build" ]]; then
+        FORCE_BUILD=true
+    fi
+done
 
-export CGO_CFLAGS="-I$ROOT_DIR/include"
-export CGO_LDFLAGS="$ROOT_DIR/lib/linux_amd64/liblancedb_go.a -lm -ldl -lpthread"
+if [[ "$FORCE_BUILD" == "true" ]] || [[ ! -f "loom" ]]; then
+    # 2. Build Loom binary
+    echo -e "${BLUE}Building Loom with LanceDB storage engine...${NC}"
+    ROOT_DIR=$(pwd)
 
-go build -o loom .
+    export CGO_CFLAGS="-I$ROOT_DIR/include"
+    export CGO_LDFLAGS="$ROOT_DIR/lib/linux_amd64/liblancedb_go.a -lm -ldl -lpthread"
 
-echo -e "${GREEN}Build successful: Binary compiled at $ROOT_DIR/loom${NC}"
+    go build -o loom .
+
+    echo -e "${GREEN}Build successful: Binary compiled at $ROOT_DIR/loom${NC}"
+else
+    echo -e "${GREEN}Loom binary already exists. Skipping build. (Use --build to force)${NC}"
+fi
 
 # 3. Install Loom binary
 INSTALL_DIR="/usr/local/bin"

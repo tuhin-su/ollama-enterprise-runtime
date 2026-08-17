@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"sync"
 	"time"
+
+	"github.com/loom/loom/server/memory"
 )
 
 // DataFlowEvent captures a real-time event in Loom for RabbitMQ streaming.
