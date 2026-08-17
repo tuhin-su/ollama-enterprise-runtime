@@ -189,14 +189,14 @@ FetchContent_MakeAvailable(llama_cpp)
 # Link the Loom-compat source files into the fetched llama target.
 # Kept separate from the hook patch so our .cpp/.h stay
 # on-disk in llama/compat/ rather than being copied into _deps/.
-if(_loom_link_compat_sources AND DEFINED LOOM_LLAMA_CPP_COMPAT_DIR)
+if(_loom_link_compat_sources AND DEFINED OLLAMA_LLAMA_CPP_COMPAT_DIR)
     file(GLOB _compat_sources CONFIGURE_DEPENDS
-        ${LOOM_LLAMA_CPP_COMPAT_DIR}/*.cpp)
+        ${OLLAMA_LLAMA_CPP_COMPAT_DIR}/*.cpp)
     foreach(_compat_target IN ITEMS llama mtmd)
         if(TARGET ${_compat_target})
             target_sources(${_compat_target} PRIVATE ${_compat_sources})
             target_include_directories(${_compat_target} PRIVATE
-                ${LOOM_LLAMA_CPP_COMPAT_DIR}
+                ${OLLAMA_LLAMA_CPP_COMPAT_DIR}
                 ${llama_cpp_SOURCE_DIR}/src)
         endif()
     endforeach()
@@ -207,13 +207,13 @@ endif()
 
 # Link temporary architecture sources (llama/compat/models/*.cpp) into the
 # llama target only (not the mtmd projector lib).
-if(_loom_link_compat_sources AND DEFINED LOOM_LLAMA_CPP_COMPAT_DIR)
+if(_loom_link_compat_sources AND DEFINED OLLAMA_LLAMA_CPP_COMPAT_DIR)
     file(GLOB _loom_model_sources CONFIGURE_DEPENDS
-        ${LOOM_LLAMA_CPP_COMPAT_DIR}/models/*.cpp)
+        ${OLLAMA_LLAMA_CPP_COMPAT_DIR}/models/*.cpp)
     if(_loom_model_sources AND TARGET llama)
         target_sources(llama PRIVATE ${_loom_model_sources})
         target_include_directories(llama PRIVATE
-            ${LOOM_LLAMA_CPP_COMPAT_DIR}/models
+            ${OLLAMA_LLAMA_CPP_COMPAT_DIR}/models
             ${llama_cpp_SOURCE_DIR}/src)
     endif()
 endif()
