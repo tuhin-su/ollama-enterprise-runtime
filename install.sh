@@ -77,15 +77,22 @@ INSTALL_DIR="/usr/local/bin"
 echo -e "${BLUE}Installing loom binary to $INSTALL_DIR...${NC}"
 if [ -w "$INSTALL_DIR" ]; then
     cp loom "$INSTALL_DIR/loom"
+    if [ -d "$ROOT_DIR/build/lib/loom" ]; then
+        mkdir -p /usr/local/lib
+        cp -r "$ROOT_DIR/build/lib/loom" "/usr/local/lib/loom"
+    fi
     echo -e "${GREEN}Success! loom has been installed to $INSTALL_DIR/loom${NC}"
 else
     echo -e "${YELLOW}Notice: Write permission denied to $INSTALL_DIR. Trying with sudo...${NC}"
     if command -v sudo &> /dev/null; then
         sudo cp loom "$INSTALL_DIR/loom"
+        if [ -d "$ROOT_DIR/build/lib/loom" ]; then
+            sudo mkdir -p /usr/local/lib
+            sudo cp -r "$ROOT_DIR/build/lib/loom" "/usr/local/lib/loom"
+        fi
         echo -e "${GREEN}Success! loom has been installed to $INSTALL_DIR/loom using sudo.${NC}"
     else
         echo -e "${RED}Error: Could not write to $INSTALL_DIR and 'sudo' is not available.${NC}"
-        echo -e "${YELLOW}Please manually copy the 'loom' binary to your path, e.g.:${NC}"
-        echo -e "  cp loom ~/.local/bin/loom"
+        echo -e "${YELLOW}Please manually copy the 'loom' binary and 'build/lib/loom' payloads.${NC}"
     fi
 fi
