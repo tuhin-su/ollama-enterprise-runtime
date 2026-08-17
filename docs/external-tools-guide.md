@@ -1,6 +1,6 @@
-# External Tool Developer Guide: WebSocket & Dynamic Tool Integration
+# External Tool Developer Guide: WebSocket, Dynamic Tools & Automatic Fallbacks
 
-This guide explains how to build, register, and execute external tools with **Loom Enterprise Runtime** using the high-speed WebSocket interface (`ws://localhost:11434/api/tools/interface`) and RAG vector ToolManager.
+This guide explains how to build, register, and execute external tools with **Loom Enterprise Runtime** using the high-speed WebSocket interface (`ws://localhost:11434/api/tools/interface`), RAG vector ToolManager, and automated error fallback handling.
 
 ---
 
@@ -28,14 +28,41 @@ sequenceDiagram
     Model->>Loom: Invoke External Tool Call
 
     Loom->>Tool: Send WebSocket Message (`type: "execute_tool"`, `request_id`, `payload`)
-    Tool->>Tool: Execute Logic (Call external API / DB query)
-    Tool->>Loom: Send Result Back (`type: "tool_call_model"`, `request_id`, `payload`)
+    
+    alt Successful Execution
+        Tool->>Loom: Return Result (`type: "tool_call_model"`, `request_id`, `payload`)
+    else Tool Timeout / Exception (Automatic Fallback)
+        Loom->>Loom: Intercept Error via FallbackManager
+        Loom->>Tool: Retry Tool Execution (Attempt #2)
+        Loom->>Model: Inject Graceful Failure Payload (Prevents Pipeline Crash)
+    end
+
     Loom->>Model: Inject Tool Result & Synthesize Response
 ```
 
 ---
 
-## 2. WebSocket Communication Protocol
+## 2. Automatic Tool Fallback & Error Interception
+
+Loom includes a native **Fallback Manager** (`server/fallback.go`) that ensures external tool failures never crash the conversation pipeline.
+
+### Fallback Behavior for External Tools
+
+1. **Automatic Retry:** If an external tool worker disconnects, times out, or returns an error, Loom automatically retries the tool execution after a brief delay.
+2. **Graceful Payload Injection:** If retries fail, Loom generates a structured fallback payload back to the model:
+   ```json
+   {
+     "status": "failed",
+     "error": "Tool 'get_stock_price' execution encountered an error: connection timeout",
+     "recovered_by": "fallback_system",
+     "recommendation": "Acknowledge the tool issue to the user and proceed with available text context."
+   }
+   ```
+3. **Error Audit Logging (`get_error_logs`):** Every failure and recovery event is recorded in the server's error log. Models can call `get_error_logs` to diagnose tool issues dynamically.
+
+---
+
+## 3. WebSocket Communication Protocol
 
 ### Connection URL
 - `ws://127.0.0.1:11434/api/tools/interface`
@@ -102,9 +129,9 @@ The tool worker executes its logic and returns the response over the active WebS
 
 ---
 
-## 3. Production Python Implementation Example
+## 4. Production Python Implementation Example (With Fallback Error Handling)
 
-Below is a complete, runnable Python client using `asyncio` and `websockets` to register an external tool worker:
+Below is a complete, runnable Python client using `asyncio` and `websockets` with fallback error handling:
 
 ```python
 import asyncio
@@ -137,16 +164,26 @@ STOCK_TOOL_SCHEMA = {
     }
 }
 
-# 2. Tool Execution Logic
+# 2. Tool Execution Logic with Exception Handling
 def handle_stock_price(payload: dict) -> dict:
-    symbol = payload.get("symbol", "").upper()
-    logger.info(f"Executing stock lookup for symbol: {symbol}")
-    
-    # Mock data lookup (replace with actual API call)
-    prices = {"AAPL": "$235.50", "GOOGL": "$175.20", "TSLA": "$210.00"}
-    price = prices.get(symbol, "$100.00")
-    
-    return {"status": "success", "symbol": symbol, "price": price}
+    try:
+        symbol = payload.get("symbol", "").upper()
+        if not symbol:
+            raise ValueError("Missing 'symbol' parameter in payload")
+            
+        logger.info(f"Executing stock lookup for symbol: {symbol}")
+        prices = {"AAPL": "$235.50", "GOOGL": "$175.20", "TSLA": "$210.00"}
+        price = prices.get(symbol, "$100.00")
+        
+        return {"status": "success", "symbol": symbol, "price": price}
+    except Exception as e:
+        logger.error(f"Execution error in tool worker: {e}")
+        # Return structured error payload for Loom Fallback Manager
+        return {
+            "status": "error",
+            "error": str(e),
+            "recovered_by": "tool_worker_exception_handler"
+        }
 
 # 3. Persistent Worker Loop
 async def run_tool_worker():
@@ -154,7 +191,6 @@ async def run_tool_worker():
         try:
             logger.info("Connecting to Loom Tool Interface...")
             async with websockets.connect(LOOM_WS_URL) as ws:
-                # Send Auth & Schema
                 auth_msg = {
                     "auth_token": AUTH_TOKEN,
                     "role": "tool",
@@ -167,17 +203,14 @@ async def run_tool_worker():
                 response = await ws.recv()
                 logger.info(f"Connected & Registered: {response}")
 
-                # Listen for tool calls
                 async for message in ws:
                     data = json.loads(message)
                     if data.get("type") == "execute_tool":
                         req_id = data.get("request_id")
                         payload = data.get("payload", {})
                         
-                        # Execute
                         result = handle_stock_price(payload)
                         
-                        # Send Reply
                         reply = {
                             "type": "tool_call_model",
                             "request_id": req_id,
@@ -192,65 +225,4 @@ async def run_tool_worker():
 
 if __name__ == "__main__":
     asyncio.run(run_tool_worker())
-```
-
----
-
-## 4. Production Node.js / JavaScript Example
-
-```javascript
-const WebSocket = require('ws');
-
-const LOOM_WS_URL = 'ws://127.0.0.1:11434/api/tools/interface';
-
-function connectToolWorker() {
-  const ws = new WebSocket(LOOM_WS_URL);
-
-  ws.on('open', () => {
-    console.log('Connected to Loom WebSocket');
-    
-    ws.send(JSON.stringify({
-      auth_token: 'abc',
-      role: 'tool',
-      tool_name: 'calculate_tax',
-      tool_schema: {
-        type: 'function',
-        function: {
-          name: 'calculate_tax',
-          description: 'Calculate sales tax for an amount',
-          parameters: {
-            type: 'object',
-            properties: {
-              amount: { type: 'number' },
-              rate: { type: 'number' }
-            },
-            required: ['amount']
-          }
-        }
-      }
-    }));
-  });
-
-  ws.on('message', (message) => {
-    const data = JSON.parse(message);
-    if (data.type === 'execute_tool') {
-      const { amount, rate = 0.08 } = data.payload;
-      const tax = amount * rate;
-      
-      ws.send(JSON.stringify({
-        type: 'tool_call_model',
-        request_id: data.request_id,
-        source_tool: 'calculate_tax',
-        payload: { amount, tax, total: amount + tax }
-      }));
-    }
-  });
-
-  ws.on('close', () => {
-    console.log('Connection closed. Reconnecting...');
-    setTimeout(connectToolWorker, 3000);
-  });
-}
-
-connectToolWorker();
 ```
