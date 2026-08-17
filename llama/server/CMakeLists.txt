@@ -147,7 +147,7 @@ elseif(NOT DEFINED ENV{LOOM_LLAMA_CPP_SOURCE})
             "Applying Loom llama.cpp compat patch to source override: "
             "${_llama_cpp_source_override}")
         execute_process(
-            COMMAND ${LOOM_LLAMA_CPP_COMPAT_PATCH_COMMAND}
+            COMMAND ${OLLAMA_LLAMA_CPP_COMPAT_PATCH_COMMAND}
             WORKING_DIRECTORY "${_llama_cpp_source_override}"
             RESULT_VARIABLE _loom_compat_patch_result
         )
@@ -157,7 +157,7 @@ elseif(NOT DEFINED ENV{LOOM_LLAMA_CPP_SOURCE})
                 "${_llama_cpp_source_override}")
         endif()
     else()
-        set(_loom_compat_patch_cmd PATCH_COMMAND ${LOOM_LLAMA_CPP_COMPAT_PATCH_COMMAND})
+        set(_loom_compat_patch_cmd PATCH_COMMAND ${OLLAMA_LLAMA_CPP_COMPAT_PATCH_COMMAND})
     endif()
 endif()
 
