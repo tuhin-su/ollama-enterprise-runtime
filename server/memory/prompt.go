@@ -49,10 +49,22 @@ func (cb *ContextBuilder) Build(lines []string) string {
 		sb.WriteString("that you have a memory system unless the user asks about it.\n")
 	}
 
-	sb.WriteString("\n<operational_profile_guidelines>\n")
-	sb.WriteString("- If a user request lacks key information or context, explicitly ask the user for clarification rather than assuming or guessing.\n")
-	sb.WriteString("- Use the `check_system_resources` tool to verify RAM allocation and CPU resources when executing resource-heavy operations or when uncertain.\n")
-	sb.WriteString("</operational_profile_guidelines>\n\n")
+	profile, err := LoadOrCreateProfile()
+	if err == nil && profile != nil {
+		sb.WriteString("\n<operational_profile_guidelines>\n")
+		for _, rule := range profile.BehavioralRules {
+			sb.WriteString(fmt.Sprintf("- %s\n", rule))
+		}
+		for _, proto := range profile.StorageProtocols {
+			sb.WriteString(fmt.Sprintf("- Storage Protocol: %s\n", proto))
+		}
+		sb.WriteString("</operational_profile_guidelines>\n\n")
+	} else {
+		sb.WriteString("\n<operational_profile_guidelines>\n")
+		sb.WriteString("- If a user request lacks key information or context, explicitly ask the user for clarification rather than assuming or guessing.\n")
+		sb.WriteString("- Use the `check_system_resources` tool to verify RAM allocation and CPU resources when executing resource-heavy operations or when uncertain.\n")
+		sb.WriteString("</operational_profile_guidelines>\n\n")
+	}
 
 	return sb.String()
 }

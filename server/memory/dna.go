@@ -19,10 +19,14 @@ type DynamicProfile struct {
 	Version         string `json:"version"`
 	BehaviorProfile string `json:"behavior_profile"` // e.g. "analytical", "concise", "creative"
 	
+	// Behavioral Rules & User Storage Protocols
+	BehavioralRules  []string `json:"behavioral_rules"`
+	StorageProtocols []string `json:"storage_protocols"`
+
 	// Dynamic Learning & Execution Traits
-	ConfidenceThreshold float64 `json:"confidence_threshold"` // Below this, ask user for clarification
-	EnableSystemCheck   bool    `json:"enable_system_check"`   // Inspect memory/CPU before execution
-	AutoAskUserOnMissing bool   `json:"auto_ask_user_on_missing"` // Prompt user when facts are unknown
+	ConfidenceThreshold  float64 `json:"confidence_threshold"` // Below this, ask user for clarification
+	EnableSystemCheck    bool    `json:"enable_system_check"`   // Inspect memory/CPU before execution
+	AutoAskUserOnMissing bool    `json:"auto_ask_user_on_missing"` // Prompt user when facts are unknown
 
 	// Environment & Hardware Snapshot
 	AllocatedRAMMB uint64 `json:"allocated_ram_mb"`
@@ -55,8 +59,17 @@ func LoadOrCreateProfile() (*DynamicProfile, error) {
 
 	profilePath := filepath.Join(dnaDir, "profile.json")
 	p := &DynamicProfile{
-		Version:              "1.0.0",
-		BehaviorProfile:      "analytical",
+		Version:         "1.0.0",
+		BehaviorProfile: "analytical",
+		BehavioralRules: []string{
+			"Always maintain high accuracy and prioritize verifiable facts over guesses.",
+			"When user shares critical data (credentials, keys, preferences), automatically save to long-term memory.",
+			"If confidence is low or required parameters are missing, ask the user for explicit clarification.",
+		},
+		StorageProtocols: []string{
+			"Pin important memories when explicitly marked as high priority by the user.",
+			"Tag user preferences as 'user_preference' and project constraints as 'project_rule'.",
+		},
 		ConfidenceThreshold:  0.65,
 		EnableSystemCheck:    true,
 		AutoAskUserOnMissing: true,
