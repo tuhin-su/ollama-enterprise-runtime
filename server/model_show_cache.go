@@ -139,7 +139,11 @@ func (c *modelShowCache) runStartup(ctx context.Context) {
 		case errors.Is(err, errModelShowNoCloud):
 			slog.Debug("skipping model show cloud cache hydration because cloud is disabled")
 		default:
-			slog.Warn("model show cloud cache hydration failed", "error", err)
+			if strings.Contains(err.Error(), "404") {
+				slog.Debug("skipping model show cloud cache hydration (remote endpoint unavailable)")
+			} else {
+				slog.Warn("model show cloud cache hydration failed", "error", err)
+			}
 		}
 	}
 }

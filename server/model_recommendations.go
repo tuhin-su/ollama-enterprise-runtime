@@ -165,7 +165,11 @@ func (c *modelRecommendationsCache) run(ctx context.Context) {
 			slog.Debug("skipping model recommendations refresh because cloud is disabled")
 		default:
 			failures++
-			slog.Warn("model recommendations refresh failed", "error", err)
+			if strings.Contains(err.Error(), "404") {
+				slog.Debug("model recommendations refresh remote skipped", "error", err)
+			} else {
+				slog.Warn("model recommendations refresh failed", "error", err)
+			}
 		}
 
 		var wait time.Duration
