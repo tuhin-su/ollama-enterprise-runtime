@@ -6,12 +6,12 @@ Wants=network-online.target
 [Service]
 Type=exec
 ExecStart=/usr/local/bin/loom serve
-User=loom
-Group=loom
+User=master
+Group=master
 Restart=always
 RestartSec=3
 Environment="LOOM_HOST=0.0.0.0:11434"
-Environment="LOOM_MODELS=/var/lib/loom/models"
+Environment="LOOM_MODELS=/home/master/.models"
 LimitNOFILE=65536
 MemoryAccounting=true
 CPUAccounting=true

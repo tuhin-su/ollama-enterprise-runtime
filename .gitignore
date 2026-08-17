@@ -21,4 +21,4 @@ integration/testdata/models/
 /include/lancedb.h
 /lib/
 *.lance
-
+/loom
