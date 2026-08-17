@@ -364,6 +364,8 @@ func minInt(a, b int) int {
 // ---------------------------------------------------------------------------
 
 type serverJSON struct {
+	APIToken                 string `json:"api_token"`
+	DisableLoomCloud         bool   `json:"disable_loom_cloud"`
 	Host                     string `json:"host"`
 	ModelsDir                string `json:"models_dir"`
 	DefaultModel             string `json:"default_model"`
@@ -376,7 +378,7 @@ type serverJSON struct {
 }
 
 // LoadConfig reads ~/.loom/server.json and merges configuration parameters.
-// If server.json does not exist, it guarantees robust production defaults and creates the default server.json file.
+// If server.json does not exist or lacks parameters, it guarantees robust production defaults and updates server.json.
 func LoadConfig() Config {
 	cfg := DefaultConfig()
 
@@ -394,6 +396,8 @@ func LoadConfig() Config {
 			// Auto-generate robust default server.json with all top-level parameters
 			_ = os.MkdirAll(configDir, 0755)
 			defaultJSON := serverJSON{
+				APIToken:                 "",
+				DisableLoomCloud:         false,
 				Host:                     cfg.Host,
 				ModelsDir:                cfg.ModelsDir,
 				DefaultModel:             cfg.DefaultModel,
@@ -412,10 +416,48 @@ func LoadConfig() Config {
 		return cfg
 	}
 
+	var rawMap map[string]any
+	_ = json.Unmarshal(data, &rawMap)
+
 	var sj serverJSON
 	if err := json.Unmarshal(data, &sj); err != nil {
 		slog.Warn("memory: failed to parse server.json, using defaults", "error", err)
 		return cfg
+	}
+
+	// Auto-upgrade existing incomplete server.json file to add missing fields (e.g. rabbitmq_enabled, heartbeat_interval_seconds)
+	if rawMap != nil {
+		modified := false
+		if _, exists := rawMap["rabbitmq_enabled"]; !exists {
+			rawMap["rabbitmq_enabled"] = cfg.RabbitMQEnabled
+			modified = true
+		}
+		if _, exists := rawMap["rabbitmq_url"]; !exists {
+			rawMap["rabbitmq_url"] = cfg.RabbitMQURL
+			modified = true
+		}
+		if _, exists := rawMap["heartbeat_interval_seconds"]; !exists {
+			rawMap["heartbeat_interval_seconds"] = cfg.HeartbeatIntervalSeconds
+			modified = true
+		}
+		if _, exists := rawMap["host"]; !exists {
+			rawMap["host"] = cfg.Host
+			modified = true
+		}
+		if _, exists := rawMap["models_dir"]; !exists {
+			rawMap["models_dir"] = cfg.ModelsDir
+			modified = true
+		}
+		if _, exists := rawMap["debug"]; !exists {
+			rawMap["debug"] = cfg.Debug
+			modified = true
+		}
+		if modified {
+			if bytes, marshalErr := json.MarshalIndent(rawMap, "", "  "); marshalErr == nil {
+				_ = os.WriteFile(configFile, bytes, 0644)
+				slog.Info("memory: auto-updated server.json with missing default configuration fields", "path", configFile)
+			}
+		}
 	}
 
 	cfg.Merge(sj.Memory)

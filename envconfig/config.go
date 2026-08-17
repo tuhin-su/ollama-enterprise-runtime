@@ -478,8 +478,16 @@ func Var(key string) string {
 
 // serverConfigData holds the parsed fields from ~/.loom/server.json.
 type serverConfigData struct {
-	DisableLoomCloud bool   `json:"disable_loom_cloud,omitempty"`
-	APIToken           string `json:"api_token,omitempty"`
+	APIToken                 string `json:"api_token"`
+	DisableLoomCloud         bool   `json:"disable_loom_cloud"`
+	Host                     string `json:"host"`
+	ModelsDir                string `json:"models_dir"`
+	DefaultModel             string `json:"default_model"`
+	LogPath                  string `json:"log_path"`
+	Debug                    bool   `json:"debug"`
+	RabbitMQEnabled          bool   `json:"rabbitmq_enabled"`
+	RabbitMQURL              string `json:"rabbitmq_url"`
+	HeartbeatIntervalSeconds int    `json:"heartbeat_interval_seconds"`
 }
 
 var (
