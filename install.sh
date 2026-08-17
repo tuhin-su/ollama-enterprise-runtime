@@ -49,6 +49,7 @@ else
     echo -e "${GREEN}LanceDB native artifacts already present.${NC}"
 fi
 
+ROOT_DIR=$(pwd)
 FORCE_BUILD=false
 for arg in "$@"; do
     if [[ "$arg" == "--build" ]]; then
@@ -59,7 +60,6 @@ done
 if [[ "$FORCE_BUILD" == "true" ]] || [[ ! -f "loom" ]]; then
     # 2. Build Loom binary
     echo -e "${BLUE}Building Loom with LanceDB storage engine...${NC}"
-    ROOT_DIR=$(pwd)
 
     export CGO_CFLAGS="-I$ROOT_DIR/include"
     export CGO_LDFLAGS="$ROOT_DIR/lib/linux_amd64/liblancedb_go.a -lm -ldl -lpthread"
