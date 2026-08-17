@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"encoding/json"
 	"math"
 	"regexp"
 	"sort"
@@ -11,12 +10,12 @@ import (
 
 // BM25Index implements an in-memory sparse BM25 search index for ultra-fast exact keyword lookups (<1ms).
 type BM25Index struct {
-	mu         sync.RWMutex
-	docs       map[string]BM25Document
-	docFreq    map[string]int
-	totalLen   int64
-	k1         float64
-	b          float64
+	mu       sync.RWMutex
+	docs     map[string]BM25Document
+	docFreq  map[string]int
+	totalLen int64
+	k1       float64
+	b        float64
 }
 
 // BM25Document represents an indexed text item.
@@ -44,6 +43,8 @@ func NewBM25Index() *BM25Index {
 		b:       0.75,
 	}
 }
+
+var tokenizeRegex = regexp.MustCompile(`[a-zA-Z0-9_-]+`)
 
 func tokenize(text string) []string {
 	if len(text) == 0 {
