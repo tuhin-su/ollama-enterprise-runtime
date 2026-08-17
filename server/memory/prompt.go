@@ -36,19 +36,24 @@ func (mb *MemoryBuilder) Build(memories []*SearchResult, maxTokens int) ([]strin
 type ContextBuilder struct{}
 
 func (cb *ContextBuilder) Build(lines []string) string {
-	if len(lines) == 0 {
-		return ""
-	}
 	var sb strings.Builder
-	sb.WriteString("\n\n<memory_context>\n")
-	for _, line := range lines {
-		sb.WriteString(line)
-		sb.WriteByte('\n')
+	if len(lines) > 0 {
+		sb.WriteString("\n\n<memory_context>\n")
+		for _, line := range lines {
+			sb.WriteString(line)
+			sb.WriteByte('\n')
+		}
+		sb.WriteString("</memory_context>\n\n")
+		sb.WriteString("Use the above memories to personalize your responses. ")
+		sb.WriteString("Reference relevant memories naturally without explicitly mentioning ")
+		sb.WriteString("that you have a memory system unless the user asks about it.\n")
 	}
-	sb.WriteString("</memory_context>\n\n")
-	sb.WriteString("Use the above memories to personalize your responses. ")
-	sb.WriteString("Reference relevant memories naturally without explicitly mentioning ")
-	sb.WriteString("that you have a memory system unless the user asks about it.")
+
+	sb.WriteString("\n<operational_profile_guidelines>\n")
+	sb.WriteString("- If a user request lacks key information or context, explicitly ask the user for clarification rather than assuming or guessing.\n")
+	sb.WriteString("- Use the `check_system_resources` tool to verify RAM allocation and CPU resources when executing resource-heavy operations or when uncertain.\n")
+	sb.WriteString("</operational_profile_guidelines>\n\n")
+
 	return sb.String()
 }
 

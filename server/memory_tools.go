@@ -249,6 +249,18 @@ func GetMemoryTools(ctx context.Context, s *Server) api.Tools {
 	// Append self-modifying memory tools
 	memTools = append(memTools, memory.GetSelfModifyingTools()...)
 
+	// Append check_system_resources tool
+	memTools = append(memTools, api.Tool{
+		Type: "function",
+		Function: api.ToolFunction{
+			Name:        "check_system_resources",
+			Description: "Check current RAM allocation, CPU core counts, Goroutines, and confidence parameters before executing resource-intensive tasks or when context is uncertain.",
+			Parameters: api.ToolFunctionParameters{
+				Type: "object",
+			},
+		},
+	})
+
 	return memTools
 }
 
@@ -573,6 +585,20 @@ func (s *Server) ExecuteMemoryTool(ctx context.Context, userID string, toolCall 
 			"logs":        resultLines,
 		}
 		resBytes, _ := json.Marshal(resMap)
+		return string(resBytes), nil
+
+	case "check_system_resources":
+		profile, _ := memory.LoadOrCreateProfile()
+		status := profile.CheckSystemResources()
+		resBytes, _ := json.Marshal(map[string]any{
+			"status":            "success",
+			"allocated_sys_ram": fmt.Sprintf("%d MB", status.AllocatedSysRAMMB),
+			"heap_alloc":        fmt.Sprintf("%d MB", status.HeapAllocMB),
+			"cpu_cores":         status.CPUCount,
+			"active_goroutines": status.NumGoroutine,
+			"sufficient_ram":    status.SufficientRAM,
+			"profile":           profile,
+		})
 		return string(resBytes), nil
 
 	case "check_data_flow":
