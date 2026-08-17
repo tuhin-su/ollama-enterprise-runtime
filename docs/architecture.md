@@ -1,44 +1,50 @@
-# Loom Architecture Overview
+# Loom Enterprise Architecture Overview
 
-This document outlines the high-level architecture of Loom, with a specific focus on the newly introduced **Agentic Model Chaining** and **Dynamic Model Resolution** capabilities.
+This document outlines the detailed architecture of Loom, focusing on **Agentic Model Chaining**, **Enterprise RAG Chunking & Hybrid Search**, **Automated Fallback Systems**, **Real-Time Online Self-Supervised Learning (SSL)**, **RabbitMQ Dataflow Telemetry**, and **Zero-Copy Shared Memory (SHM)**.
 
-## 1. Core Model Chaining & Pipeline Orchestration
+---
 
-### Concept
-Loom now supports **Model Chaining** and **Pipeline Orchestration**, enabling a default general-purpose model to dynamically delegate complex subtasks (e.g., vision processing, coding, math) to specialized models available locally.
+## 1. Core Model Chaining & Pipeline Orchestration (`server/model_chain.go`)
 
-### Implementation
-- **RAG Tool Manager**: Instead of injecting the `chain_request` tool into every prompt and bloating the context window, it is natively registered inside the `ToolManager` (a LanceDB volatile vector index).
-- **Meta-Tool Search**: The model's context only contains a single meta-tool (`toolmanager.search`). When the model needs to chain tasks, it uses this tool to dynamically retrieve the `chain_request` tool.
-- **Orchestration**: The `chain_request` tool acts as a bridge. If the primary model encounters a request requiring a capability it lacks (e.g., analyzing an image), it triggers the tool, specifying a `reason` and breaking the work into `sub_tasks`. 
-- **Model Awareness**: When building the tool prompt, Loom automatically fetches a list of locally available models, including their descriptions and capabilities. These are appended to the tool's description so the orchestrator model is fully aware of its environment and can supply a `preferred_model`.
+Loom enables a primary general-purpose orchestrator model to dynamically delegate subtasks (e.g. vision processing, coding, math) to specialized local models.
 
-## 1.5 RAG Tool Architecture & WebSocket Integrations
+- **RAG Tool Manager**: To avoid Context Window bloat, native tools (`chain_request`, `system_tool`, `schedule_task`, `update_memory`) are registered inside a volatile LanceDB vector index (`ToolManager`).
+- **Meta-Tool Search**: The model context starts slim, containing only `toolmanager.search`. Models query this meta-tool on demand.
+- **Dynamic Model Resolution (`selectModelForTask`)**: Matches requested capabilities (`vision`, `code`) against model manifest descriptions and Modelfile `DESCRIPTION` keywords.
 
-### Concept
-Loom implements a **Retrieval-Augmented Generation (RAG) Tool Architecture** to prevent context window bloat when exposing dozens of tools (like memory tools, scheduling, or external scripts) to the model.
+---
 
-### Implementation
-- **Volatile Vector DB**: A LanceDB index is initialized in `~/.loom/toolsmanager_db`. It is wiped on server startup to prevent stale tool schemas.
-- **WebSocket Server**: External clients (like Python scripts) can connect via WebSockets. Their tools are dynamically embedded and inserted into the `ToolManager`.
-- **Built-in Tools**: Loom's native tools (Memory, Chaining) are registered directly into the `ToolManager` at startup instead of being hardcoded into the system prompt.
+## 2. Enterprise RAG & Hybrid Search Subsystem (`server/memory/`)
 
-## 2. Dynamic Model Resolution
+Loom provides a multi-strategy RAG engine built for high-throughput and sub-millisecond retrieval:
 
-### Concept
-To ensure tasks are routed to the most capable model without relying on hardcoded strings, Loom employs dynamic model resolution based on model metadata.
+- **Document Chunker (`chunker.go`)**: Supports **Recursive Character Splitting** (with fallback separators `\n\n`, `\n`, `. `, ` `), **Sliding Window Token Overlaps**, and **Markdown Header Boundary Splitting**.
+- **BM25 In-Memory Index (`bm25.go`)**: Provides sub-millisecond sparse keyword lookups for exact term matching.
+- **Reciprocal Rank Fusion (RRF)**: Merges dense vector cosine similarity scores with BM25 sparse search results without requiring neural cross-encoder passes.
+- **Source Attribution**: Injects provenance headers `(Source: document.pdf | Page: 4 | Lines: 12-45)` into system prompt memory context.
+- **Self-Modifying Memory (`assistant.go`)**: Exposes `update_memory` and `pin_memory` tools so models can self-manage, update, or prioritize long-term memory facts.
 
-### Implementation
-- **Model Capabilities**: Models are mapped to capabilities such as `vision`, `code`, `math`, `tools`, etc.
-- **`selectModelForTask` (in `server/model_chain.go`)**: This function receives a requested capability or keyword and scans all local models. It uses heuristic matching across the model's name, family, system prompt, and **description** to find the optimal specialist model.
-- **Anthropic Proxy Translation**: The `AnthropicMessagesHandler` (in `server/routes.go`) utilizes `selectModelForTask` to dynamically assign a local vision model when a generic or empty model name (like "claude") is provided, eliminating the need to hardcode model versions.
+---
 
-## 3. Persistent Metadata: Model Descriptions
+## 3. Automated Error Interception & Fallback System (`server/fallback.go`)
 
-### Concept
-Models need to carry semantic meaning about their purpose to aid the orchestrator in making intelligent routing decisions. 
+The `FallbackManager` provides automatic recovery across runtime inference failures and tool errors:
 
-### Implementation
-- **Modelfile `DESCRIPTION`**: The `parser` natively recognizes the `DESCRIPTION` keyword in `Modelfiles`.
-- **Config & Manifest Integration**: The description is captured in the API's `CreateRequest`, persisted in the model's configuration (`model.ConfigV2`), and baked into the manifest metadata upon creation (`server/create.go`).
-- **Visibility**: The `modelListSummary` struct caches this description, allowing it to be surfaced efficiently via `loom list` and `loom show` endpoints, and crucially, fed into the `GetChainTools()` tool descriptions for agentic awareness.
+- **Model Swapping (`ExecuteWithModelFallback`)**: Intercepts model completion errors or OOMs and swaps execution to an alternative local model seamlessly.
+- **Tool Call Retry & Graceful Payload (`ExecuteWithToolFallback`)**: Retries failed tool calls and returns graceful structured payloads to keep prompt streams intact.
+- **Error Log Diagnostics (`get_error_logs`)**: Records error traces in an in-memory audit log accessible to the model for automated self-diagnosis.
+
+---
+
+## 4. Real-Time Online Self-Supervised Learning (SSL) (`server/memory/ssl.go`)
+
+- **Online SSL Step (`LearnFromTurn`)**: Operates non-blockingly inside the background worker pool after completion streaming finishes, evaluating real-time contrastive loss ($L_{\text{contrastive}} = 1.0 - \text{CosineSimilarity}$).
+- **Dataset Exporter (`cmd/export_data.go`)**: Exposes `loom export-data` to dump LanceDB interaction histories into structured JSONL training datasets for offline fine-tuning.
+
+---
+
+## 5. Telemetry & Shared Memory Optimization
+
+- **RabbitMQ Telemetry (`server/rabbitmq.go`)**: Streams dataflow events (`chat_request`, `token_stream`, `tool_call`, `ssl_step`) to external RabbitMQ/AMQP visualization brokers.
+- **POSIX Shared Memory (`server/memory/shm.go`)**: Uses `/dev/shm` POSIX `mmap` syscalls and unsafe pointer slice headers (`unsafe.Pointer`) to pass IPC tensor data with zero memory copies.
+- **Lock-Free Cross-Module Bus (`server/memory/bus.go`)**: Atomic circular ring buffer (`ModuleDataBus`) enables sub-nanosecond module-to-module pointer passing without mutex locking.
